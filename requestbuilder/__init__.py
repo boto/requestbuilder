@@ -83,11 +83,11 @@ class Filter(object):
         try:
             value = self.type(str_value)
         except ValueError:
-            raise argparse.ArgumentTypeError('%s does not have type %s' %
-                                             (str_value, self.type.__name__))
+            raise argparse.ArgumentTypeError('{0} must have type {1}'.format(
+                    str.value, self.type.__name__))
         if self.choices and value not in self.choices:
-            msg = 'filter value %s does not match any of %s' % (value,
-                    ', '.join([str(choice) for choice in self.choices]))
+            msg = 'filter value {0} must match one of {1}'.format(
+                    value, ', '.join([str(choice) for choice in self.choices]))
             raise argparse.ArgumentTypeError(msg)
         return value
 
