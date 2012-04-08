@@ -92,6 +92,19 @@ class Filter(object):
         return value
 
 
+def PrefixComparableString(data='', prefix=None):
+    '''
+    A wrapper for the str class that makes equality checking only take the
+    first portion of another string into account.
+    '''
+    class __PrefixComparableString(str):
+        def __eq__(self, other):
+            if isinstance(other, str) and prefix:
+                return other.startswith(prefix)
+            return str.__eq__(self, other)
+    return __PrefixComparableString(data)
+
+
 # Constants (enums?) used for arg routing
 CONNECTION = '==CONNECTION=='
 PARAMS     = '==PARAMS=='
