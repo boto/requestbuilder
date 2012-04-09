@@ -388,9 +388,12 @@ class BaseRequest(object):
         self.Filters.  The result is meant to be used as command line help
         output.
         """
+        ## FIXME:  This code has a bug with triple-quoted strings that contain
+        ##         embedded indentation.  textwrap.dedent doesn't seem to help.
+        ##         Reproducer: 'whether the   volume will be deleted'
         max_len = 24
         col_len = max([len(filter_obj.name) for filter_obj in self.Filters
-                       if len(filter_obj.name) < max_len]) + 1
+                       if len(filter_obj.name) < max_len]) - 1
         helplines = ['available filters:']
         for filter_obj in self.Filters:
             if filter_obj.help:
