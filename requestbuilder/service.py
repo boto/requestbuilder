@@ -45,6 +45,8 @@ class BaseService(boto.connection.AWSAuthConnection):
         self._init_args.setdefault('path',     self.Path)
         self._init_args.setdefault('port',     self.Port)
         self._init_args.setdefault('provider', self.Provider)
+        if 'host' not in self._init_args:
+            raise MissingCredentialsError()
         try:
             boto.connection.AWSAuthConnection.__init__(self, **self._init_args)
         except boto.exception.NoAuthHandlerFound:
