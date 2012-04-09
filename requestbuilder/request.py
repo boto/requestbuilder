@@ -141,7 +141,7 @@ class BaseRequest(object):
         if self._connection is None:
             conn_args = {}
             for (key, val) in self.args.iteritems():
-                if key in self._arg_routes.get(CONNECTION):
+                if key in self._arg_routes.get(CONNECTION, []):
                     conn_args[key] = val
             self._connection = self.ServiceClass(**conn_args)
         return self._connection
@@ -266,6 +266,7 @@ class BaseRequest(object):
             self._cli_parser.add_argument('--filter', metavar='key=value',
                     action='append', dest='_filters', help='filter output',
                     type=partial(_parse_filter, filter_objs=self.Filters))
+            self._arg_routes.setdefault(None, [])
             self._arg_routes[None].append('_filters')
             self._cli_parser.epilog = self.__build_filter_help()
         self._cli_parser.add_argument('--version', action='version',
@@ -288,7 +289,9 @@ class BaseRequest(object):
                     self.args.get('debug', False))
 
         if '_filters' in self.args:
-            self.params['Filter'] = _process_filters(cli_args.pop('_filters'))
+            self.args['Filter'] = _process_filters(cli_args.pop('_filters'))
+            self._arg_routes.setdefault(PARAMS, [])
+            self._arg_routes[PARAMS].append('Filter')
 
     def send(self):
         '''
