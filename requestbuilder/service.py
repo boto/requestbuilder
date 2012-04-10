@@ -31,10 +31,12 @@ class BaseService(boto.connection.AWSAuthConnection):
     # Endpoint names (i.e. 'us-east-1') and their URLs
     Endpoints = {}
 
-    def __init__(self, url=None, **kwargs):
+    def __init__(self, **kwargs):
         self._init_args = kwargs
 
         self.find_credentials()
+        # We do this now in case find_credentials wants to add a url
+        url = self._init_args.pop('url', None)
         self._read_url_info(url or os.getenv(self.EnvURL))
         if self.Endpoints:
             if 'region_name' in self._init_args:
