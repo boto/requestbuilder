@@ -33,15 +33,12 @@ from .service import BaseService, MissingCredentialsError
 
 class InheritableRequestClass(type):
     '''
-    Classes of this type allow one to specify 'Args', 'Filters', 'ListMarkers',
-    and 'ItemMarkers' lists as attributes of classes and have them be appended
-    to their superclasses' rather than clobbering them.
-
-    Additionally, all method calls are decorated with a function that renames
-    logs to that of the the object's name() return value.
+    Classes of this type allow one to specify 'Args' and 'Filters' lists as
+    attributes of classes and have them be appended to their superclasses'
+    rather than clobbering them.
     '''
     def __new__(mcs, name, bases, attrs):
-        for attrname in ('Args', 'Filters', 'ListMarkers', 'ItemMarkers'):
+        for attrname in ('Args', 'Filters'):
             if attrname in attrs:
                 for base in bases:
                     for attr in getattr(base, attrname, []):
