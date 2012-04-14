@@ -12,47 +12,20 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
 # OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-import argparse
-import bdb
 import boto.jsonresponse
-from functools import partial
-import json
-import pprint
 import sys
-import textwrap
-import traceback
-import types
 
-try:
-    import epdb
-except ImportError:
-    import pdb
-
-from . import __version__, CONNECTION, PARAMS, Arg, MutuallyExclusiveArgList
+from . import CONNECTION, PARAMS
+from .command import BaseCommand
 from .service import BaseService, MissingCredentialsError
 
-class InheritableRequestClass(type):
-    '''
-    Classes of this type allow one to specify 'Args' and 'Filters' lists as
-    attributes of classes and have them be appended to their superclasses'
-    rather than clobbering them.
-    '''
-    def __new__(mcs, name, bases, attrs):
-        for attrname in ('Args', 'Filters'):
-            if attrname in attrs:
-                for base in bases:
-                    for attr in getattr(base, attrname, []):
-                        if attr not in attrs[attrname]:
-                            attrs[attrname].append(attr)
-        return type.__new__(mcs, name, bases, attrs)
-
-class BaseRequest(object):
+class BaseRequest(BaseCommand):
     '''
     The basis for a command line tool that represents a request.  To invoke
     this as a command line tool, call the do_cli() method on an instance of the
     class; arguments will be parsed from the command line.  To invoke this in
-    another context, pass keyword args to __init__ with names that match those
-    stored by the argument parser and then call main().
+    another context, pass keyword args to __init__() with names that match
+    those stored by the argument parser and then call main().
 
     Important methods in this class include:
      - do_cli:       command line entry point
@@ -64,7 +37,7 @@ class BaseRequest(object):
     To be useful a tool should inherit from this class and implement the main()
     and print_result() methods.  The do_cli() method functions as the entry
     point for the command line, populating self.args from the command line and
-    then calling mein() and print_result() in sequence.  Other tools may
+    then calling main() and print_result() in sequence.  Other tools may
     instead supply arguments via __init__() and then call main() alone.
 
     Important members of this class include:
@@ -87,22 +60,14 @@ class BaseRequest(object):
                      which are *prepended* to those of their parent classes.
     '''
 
-    __metaclass__ = InheritableRequestClass
-    Version = 'requestbuilder ' + __version__
-
     ServiceClass = BaseService
     APIVersion   = None
     Action       = None
-    Description  = ''
 
-    ListMarkers = []
-    ItemMarkers = []
+    ListMarkers  = []
+    ItemMarkers  = []
 
-    Args = [Arg('-D', '--debug', action='store_true', route_to=None,
-                help='show debugging output'),
-            Arg('--debugger', action='store_true', route_to=None,
-                help='enable interactive debugger on error')]
-    Filters = []
+    DefaultRoute = PARAMS
 
     def name(self):
         '''
@@ -112,9 +77,7 @@ class BaseRequest(object):
         return self.Action or self.__class__.__name__
 
     def __init__(self, **kwargs):
-        # Arguments corresponding to those in self.Args.  This may be used in
-        # lieu of (and will take priority over) arguments given at the CLI.
-        self.args = kwargs
+        BaseCommand.__init__(self, **kwargs)
 
         # Parts of the HTTP request to be sent to the server.
         # Note that self.flatten_params will update self.params for each entry
@@ -127,11 +90,7 @@ class BaseRequest(object):
         # HTTP response obtained from the server
         self.http_response = None
 
-        self._arg_routes = {}
-        self._cli_parser = None
         self._connection = None
-
-        self._parse_arg_lists()
 
     @property
     def connection(self):
@@ -156,25 +115,6 @@ class BaseRequest(object):
             return self.http_response.reason
         else:
             return None
-
-    def print_result(self, data):
-        '''
-        Format data for printing at the command line and print it to standard
-        out.  The default formatter attempts to print JSON or something else
-        reasonable.  Override this method if you want specific formatting.
-        '''
-        if data:
-            if isinstance(data, dict):
-                for (key, val) in data.iteritems():
-                    if key not in ['ResponseMetadata', 'requestId']:
-                        # Will there ever be more than one of these?
-                        print json.dumps(val, indent=4)
-            elif isinstance(data, list):
-                print '\n'.join([str(item) for item in data])
-            elif isinstance(data, basestring):
-                print data
-            else:
-                pprint.pprint(data)
 
     def flatten_params(self, args, route, prefix=None):
         '''
@@ -248,48 +188,6 @@ class BaseRequest(object):
             raise TypeError('non-flattenable type: ' + args.__class__.__name__)
         return flattened
 
-    def _parse_arg_lists(self):
-        '''
-        Use self.Args and self.Filters to build a command line argument parser
-        that is stored to self._cli_parser and to populate the argument routing
-        table.
-        '''
-        self._cli_parser = argparse.ArgumentParser(
-                description='\n'.join(textwrap.wrap(self.Description)),
-                formatter_class=argparse.RawDescriptionHelpFormatter)
-        for arg_obj in self.Args:
-            self.__add_arg_to_cli_parser(arg_obj, self._cli_parser)
-        if self.Filters:
-            self._cli_parser.add_argument('--filter', metavar='key=value',
-                    action='append', dest='_filters', help='filter output',
-                    type=partial(_parse_filter, filter_objs=self.Filters))
-            self._arg_routes.setdefault(None, [])
-            self._arg_routes[None].append('_filters')
-            self._cli_parser.epilog = self.__build_filter_help()
-        self._cli_parser.add_argument('--version', action='version',
-                                      version=self.Version)
-
-    def process_cli_args(self):
-        '''
-        Process CLI args to fill in missing parts of self.args and enable
-        debugging if necessary.
-        '''
-        cli_args = self._cli_parser.parse_args().__dict__
-        for (key, val) in cli_args.iteritems():
-            self.args.setdefault(key, val)
-
-        if self.args.get('debug'):
-            boto.set_stream_logger(self.name())
-        if self.args.get('debugger'):
-            sys.excepthook = _requestbuilder_except_hook(
-                    self.args.get('debugger', False),
-                    self.args.get('debug', False))
-
-        if '_filters' in self.args:
-            self.args['Filter'] = _process_filters(cli_args.pop('_filters'))
-            self._arg_routes.setdefault(PARAMS, [])
-            self._arg_routes[PARAMS].append('Filter')
-
     def send(self):
         '''
         Send a request to the server and return its response.  More precisely:
@@ -340,141 +238,19 @@ class BaseRequest(object):
         The main processing method for this type of request.  In this method,
         inheriting classes generally populate self.headers, self.params, and
         self.post_data with information gathered from self.args or elsewhere,
-        call self.send, and return the response.
+        call self.send, and return the response.  BaseRequest's default
+        behavior is to simply return the result of a request with everything
+        that routes to PARAMS.
         '''
-        pass
+        return self.send()
 
-    def do_cli(self):
-        '''
-        The entry point for the command line.  This method parses command line
-        arguments using the class's Args and Filters lists to populate
-        self.args, obtains a response from the main method, then passes the
-        result to print_result.
-        '''
-        try:
-            self.process_cli_args()  # self.args is populated
-            response = self.main()
-            self.print_result(response)
-        except self.ServiceClass.ResponseError as err:
+    def _handle_cli_exception(self, err):
+        if isinstance(err, self.ServiceClass.ResponseError):
             sys.exit('error ({code}) {msg}'.format(code=err.error_code,
                                                    msg=err.error_message))
-        except MissingCredentialsError as err:
+        elif isinstance(err, MissingCredentialsError):
             sys.exit('error: unable to find credentials')
-        except Exception as err:
-            if self.args.get('debug'):
-                raise
-            if '--debug' in sys.argv or '-D' in sys.argv:
-                # In case an error occurs during argument parsing
-                raise
-            sys.exit('error: {0}'.format(err))
-
-    def __add_arg_to_cli_parser(self, arglike_obj, parser):
-        if isinstance(arglike_obj, Arg):
-            arg = parser.add_argument(*arglike_obj.pargs, **arglike_obj.kwargs)
-            self._arg_routes.setdefault(arglike_obj.route, [])
-            self._arg_routes[arglike_obj.route].append(arg.dest)
-        elif isinstance(arglike_obj, MutuallyExclusiveArgList):
-            exgroup = parser.add_mutually_exclusive_group(
-                    required=arglike_obj.required)
-            for group_arg in arglike_obj:
-                self.__add_arg_to_cli_parser(group_arg, exgroup)
         else:
-            raise TypeError('Unknown argument type ' +
-                            arglike_obj.__class__.__name__)
-
-    def __build_filter_help(self):
-        """
-        Return a pre-formatted help string for all of the filters defined in
-        self.Filters.  The result is meant to be used as command line help
-        output.
-        """
-        ## FIXME:  This code has a bug with triple-quoted strings that contain
-        ##         embedded indentation.  textwrap.dedent doesn't seem to help.
-        ##         Reproducer: 'whether the   volume will be deleted'
-        max_len = 24
-        col_len = max([len(filter_obj.name) for filter_obj in self.Filters
-                       if len(filter_obj.name) < max_len]) - 1
-        helplines = ['available filters:']
-        for filter_obj in self.Filters:
-            if filter_obj.help:
-                if len(filter_obj.name) <= col_len:
-                    # filter-name    Description of the filter that
-                    #                continues on the next line
-                    right_space = ' ' * (max_len - len(filter_obj.name) - 2)
-                    wrapper = textwrap.TextWrapper(fix_sentence_endings=True,
-                        initial_indent=('  ' + filter_obj.name + right_space),
-                        subsequent_indent=(' ' * max_len))
-                else:
-                    # really-long-filter-name
-                    #                Description that begins on the next line
-                    helplines.append('  ' + filter_obj.name)
-                    wrapper = textwrap.TextWrapper(fix_sentence_endings=True,
-                            initial_indent=(   ' ' * max_len),
-                            subsequent_indent=(' ' * max_len))
-                helplines.extend(wrapper.wrap(filter_obj.help))
-            else:
-                helplines.append('  ' + filter_obj.name)
-        return '\n'.join(helplines)
-
-def _parse_filter(filter_str, filter_objs=None):
-    """
-    Given a "key=value" string given as a command line parameter, return a pair
-    with the matching filter's dest member and the given value after converting
-    it to the type expected by the filter.  If this is impossible, an
-    ArgumentTypeError will result instead.
-    """
-    if '=' not in filter_str:
-        msg = 'filter %s must have format "key=value"' % filter_str
-        raise argparse.ArgumentTypeError(msg)
-    (key, val_as_str) = filter_str.split('=', 1)
-    # Find the appropriate filter object
-    try:
-        filter_obj = [obj for obj in (filter_objs or []) if obj.name == key][0]
-        val = filter_obj.convert(val_as_str)
-    except IndexError:
-        raise argparse.ArgumentTypeError('unknown filter: %s' % key)
-    return (filter_obj.dest, val)
-
-def _process_filters(cli_filters):
-    """
-    Change filters from the [(key, value), ...] format given at the command
-    line to [{'Name': key, 'Value': [value, ...]}, ...] format, which
-    flattens to the form the server expects.
-    """
-    filter_args = {}
-    # Compile [(key, value), ...] pairs into {key: [value, ...], ...}
-    for (key, val) in cli_filters or {}:
-        filter_args.setdefault(key, [])
-        filter_args[key].append(val)
-    # Build the flattenable [{'Name': key, 'Value': [value, ...]}, ...]
-    filters = [{'Name': name, 'Value': values} for (name, values)
-               in filter_args.iteritems()]
-    return filters
-
-def _requestbuilder_except_hook(debugger_enabled, debug_enabled):
-    """
-    Wrapper for the debugger-launching except hook
-    """
-    def excepthook(typ, value, tracebk):
-        """
-        If the debugger option is enabled, launch epdb (or pdb if epdb is
-        unavailable) when an uncaught exception occurs.
-        """
-        if typ is bdb.BdbQuit:
-            sys.exit(1)
-        sys.excepthook = sys.__excepthook__
-
-        if debugger_enabled and sys.stdout.isatty() and sys.stdin.isatty():
-            if 'epdb' in sys.modules:
-                epdb.post_mortem(tracebk, typ, value)
-            else:
-                pdb.post_mortem(tracebk)
-        elif debug_enabled:
-            traceback.print_tb(tracebk)
-            sys.exit(1)
-        else:
-            print value
-            sys.exit(1)
-    return excepthook
+            BaseCommand._handle_cli_exception(self, err)
 
 _ALWAYS = '==ALWAYS=='
