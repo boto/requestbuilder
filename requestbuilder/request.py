@@ -163,7 +163,7 @@ class BaseRequest(BaseCommand):
                         prefixed_key = str(key)
 
                     if isinstance(val, dict) or isinstance(val, list):
-                        flattened.update(self.flatten_params(val, route,
+                        flattened.update(self.flatten_params(val, _ALWAYS,
                                                              prefixed_key))
                     elif isinstance(val, file):
                         flattened[prefixed_key] = val.read()
@@ -178,7 +178,7 @@ class BaseRequest(BaseCommand):
                     prefixed_key = str(i_item)
 
                 if isinstance(item, dict) or isinstance(item, list):
-                    flattened.update(self.flatten_params(item, route,
+                    flattened.update(self.flatten_params(item, _ALWAYS,
                                                          prefixed_key))
                 elif isinstance(item, file):
                     flattened[prefixed_key] = item.read()

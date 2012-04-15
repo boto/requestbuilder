@@ -17,14 +17,14 @@ import argparse
 __version__ = '0.0'
 
 class Arg(object):
-    """
+    '''
     A command line argument.  Positional and keyword arguments to __init__
     are the same as those to argparse.ArgumentParser.add_argument.
 
     The value specified by the 'dest' argument (or the one inferred if
     none is specified) is used as the name of the parameter to server
     queries unless send=False is also supplied.
-    """
+    '''
 
     def __init__(self, *pargs, **kwargs):
         self.route  = kwargs.pop('route_to', PARAMS)
@@ -38,14 +38,14 @@ class Arg(object):
 
 
 class MutuallyExclusiveArgList(list):
-    """
+    '''
     Pass Args as positional arguments to __init__ to create a set of
     command line arguments that are mutually exclusive.  If the first
     argument passed to __init__ is True then the user must specify
     exactly one of them.
 
     Example:  MutuallyExclusiveArgList(Arg('--one'), Arg('--two'))
-    """
+    '''
 
     def __init__(self, *args):
         if len(args) > 0 and isinstance(args[0], bool):
@@ -57,7 +57,7 @@ class MutuallyExclusiveArgList(list):
 
 
 class Filter(object):
-    """
+    '''
     An AWS API filter.  For APIs that support filtering by key/value
     pairs, adding a Filter to a request's list of filters will allow a
     user to send an output filter to the server with '--filter key=value'
@@ -65,44 +65,48 @@ class Filter(object):
 
     The value specified by the 'dest' argument (or the 'name' argument,
     if none is given) is used as the name of a filter in queries.
-    """
-    def __init__(self, name, dest=None, type=str, choices=None, help=None):
-        self.name    = name         # the name as shown on the command line
-        self.dest    = dest or name # the name as sent to the server
+    '''
+    def __init__(self, name, type=str, choices=None, help=None):
+        self.name    = name
         self.type    = type
         self.choices = choices
         self.help    = help
 
-    def convert(self, str_value):
-        """
-        Convert a value to the data type expected by this filter by calling
-        self.type on the value.  If this doesn't work then an ArgumentTypeError
-        will result.  If the conversion succeeds but does not appear in
-        self.choices when it exists, an ArgumentTypeError will result as well.
-        """
+    def matches_argval(self, argval):
+        return argval.startswith(self.name + '=')
+
+    def convert(self, argval):
+        '''
+        Given an argument to --filter of the form "<key>=<value>", convert
+        the value to the appropriate type by calling self.type on it, then
+        return a (key, converted_value) tuple.  If the value's type conversion
+        doesn't work then an ArgumentTypeError will result.  If the conversion
+        succeeds but does not appear in self.choices when it exists, an
+        ArgumentTypeError will result as well.
+        '''
+        if '=' not in argval:
+            msg = 'filter {0} must have format "KEY=VALUE"'.format(argval)
+            raise argparse.ArgumentTypeError(msg)
+        (key, value_str) = argval.split('=', 1)
         try:
-            value = self.type(str_value)
+            value = self.type(value_str)
         except ValueError:
-            raise argparse.ArgumentTypeError('{0} must have type {1}'.format(
-                    str.value, self.type.__name__))
+            msg = 'filter {0} must have type {1}'.format(
+                    value_str, self.type.__name__)
+            raise argparse.ArgumentTypeError(msg)
         if self.choices and value not in self.choices:
             msg = 'filter value {0} must match one of {1}'.format(
                     value, ', '.join([str(choice) for choice in self.choices]))
             raise argparse.ArgumentTypeError(msg)
-        return value
+        return (key, value)
 
 
-def PrefixComparableString(data='', prefix=None):
+class GenericTagFilter(Filter):
     '''
-    A wrapper for the str class that makes equality checking only take the
-    first portion of another string into account.
+    A filter that accepts "tag:<key>=<value>" values
     '''
-    class __PrefixComparableString(str):
-        def __eq__(self, other):
-            if isinstance(other, str) and prefix:
-                return other.startswith(prefix)
-            return str.__eq__(self, other)
-    return __PrefixComparableString(data)
+    def matches_argval(self, argval):
+        return argval.startswith('tag:') and '=' in argval
 
 
 # Constants (enums?) used for arg routing

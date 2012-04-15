@@ -204,11 +204,11 @@ class BaseCommand(object):
                             arglike_obj.__class__.__name__)
 
     def __build_filter_help(self):
-        """
+        '''
         Return a pre-formatted help string for all of the filters defined in
         self.Filters.  The result is meant to be used as command line help
         output.
-        """
+        '''
         ## FIXME:  This code has a bug with triple-quoted strings that contain
         ##         embedded indentation.  textwrap.dedent doesn't seem to help.
         ##         Reproducer: 'whether the   volume will be deleted'
@@ -238,30 +238,28 @@ class BaseCommand(object):
         return '\n'.join(helplines)
 
 def _parse_filter(filter_str, filter_objs=None):
-    """
+    '''
     Given a "key=value" string given as a command line parameter, return a pair
     with the matching filter's dest member and the given value after converting
     it to the type expected by the filter.  If this is impossible, an
     ArgumentTypeError will result instead.
-    """
-    if '=' not in filter_str:
-        msg = 'filter %s must have format "key=value"' % filter_str
-        raise argparse.ArgumentTypeError(msg)
-    (key, val_as_str) = filter_str.split('=', 1)
+    '''
     # Find the appropriate filter object
-    try:
-        filter_obj = [obj for obj in (filter_objs or []) if obj.name == key][0]
-        val = filter_obj.convert(val_as_str)
-    except IndexError:
-        raise argparse.ArgumentTypeError('unknown filter: %s' % key)
-    return (filter_obj.dest, val)
+    filter_objs = [obj for obj in (filter_objs or [])
+                   if obj.matches_argval(filter_str)]
+    if not filter_objs:
+        msg = '"{0}" matches no available filters'.format(filter_str)
+        raise argparse.ArgumentTypeError(msg)
+    return filter_objs[0].convert(filter_str)
 
 def _process_filters(cli_filters):
-    """
+    '''
     Change filters from the [(key, value), ...] format given at the command
     line to [{'Name': key, 'Value': [value, ...]}, ...] format, which
     flattens to the form the server expects.
-    """
+    '''
+    from pprint import pprint
+    pprint(cli_filters)
     filter_args = {}
     # Compile [(key, value), ...] pairs into {key: [value, ...], ...}
     for (key, val) in cli_filters or {}:
@@ -273,14 +271,14 @@ def _process_filters(cli_filters):
     return filters
 
 def _requestbuilder_except_hook(debugger_enabled, debug_enabled):
-    """
+    '''
     Wrapper for the debugger-launching except hook
-    """
+    '''
     def excepthook(typ, value, tracebk):
-        """
+        '''
         If the debugger option is enabled, launch epdb (or pdb if epdb is
         unavailable) when an uncaught exception occurs.
-        """
+        '''
         if typ is bdb.BdbQuit:
             sys.exit(1)
         sys.excepthook = sys.__excepthook__

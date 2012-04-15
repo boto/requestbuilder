@@ -89,10 +89,10 @@ class BaseService(boto.connection.AWSAuthConnection):
         return self._mexe(request)
 
     def _read_url_info(self, url):
-        """
+        '''
         Parse a URL and use it to fill in is_secure, host, port, and path if
         any are missing.
-        """
+        '''
         if url:
             parse_result = urlparse.urlparse(url)
             if parse_result[0] == 'https':
