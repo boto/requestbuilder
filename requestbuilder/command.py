@@ -258,8 +258,6 @@ def _process_filters(cli_filters):
     line to [{'Name': key, 'Value': [value, ...]}, ...] format, which
     flattens to the form the server expects.
     '''
-    from pprint import pprint
-    pprint(cli_filters)
     filter_args = {}
     # Compile [(key, value), ...] pairs into {key: [value, ...], ...}
     for (key, val) in cli_filters or {}:
