@@ -130,7 +130,7 @@ class BaseCommand(object):
         for arg_obj in self.Args:
             self.__add_arg_to_cli_parser(arg_obj, self._cli_parser)
         if self.Filters:
-            self._cli_parser.add_argument('--filter', metavar='key=value',
+            self._cli_parser.add_argument('--filter', metavar='KEY=VALUE',
                     action='append', dest='_filters', help='filter output',
                     type=partial(_parse_filter, filter_objs=self.Filters))
             self._arg_routes.setdefault(None, [])
