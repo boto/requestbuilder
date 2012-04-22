@@ -15,7 +15,7 @@
 import boto.jsonresponse
 import sys
 
-from . import CONNECTION, PARAMS
+from . import EMPTY, CONNECTION, PARAMS
 from .command import BaseCommand
 from .service import BaseService, MissingCredentialsError
 
@@ -169,6 +169,8 @@ class BaseRequest(BaseCommand):
                         flattened[prefixed_key] = val.read()
                     elif val or val is 0:
                         flattened[prefixed_key] = str(val)
+                    elif val is EMPTY:
+                        flattened[prefixed_key] = ''
         elif isinstance(args, list):
             for (i_item, item) in enumerate(args, 1):
                 # Prefix.1, Prefix.2, ...
@@ -184,6 +186,8 @@ class BaseRequest(BaseCommand):
                     flattened[prefixed_key] = item.read()
                 elif item or item == 0:
                     flattened[prefixed_key] = str(item)
+                elif val is EMPTY:
+                    flattened[prefixed_key] = ''
         else:
             raise TypeError('non-flattenable type: ' + args.__class__.__name__)
         return flattened
@@ -253,4 +257,4 @@ class BaseRequest(BaseCommand):
         else:
             BaseCommand._handle_cli_exception(self, err)
 
-_ALWAYS = '==ALWAYS=='
+_ALWAYS = type('_ALWAYS', (), {'__repr__': lambda self: '_ALWAYS'})()

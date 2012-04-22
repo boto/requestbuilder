@@ -109,11 +109,15 @@ class GenericTagFilter(Filter):
         return argval.startswith('tag:') and '=' in argval
 
 
+########## SINGLETONS ##########
+# Indicates a parameter that should be sent to the server without a value
+EMPTY = type('EMPTY', (), {'__repr__': lambda self: "''"})()
+
 # Constants (enums?) used for arg routing
-CONNECTION = '==CONNECTION=='
-PARAMS     = '==PARAMS=='
+CONNECTION = type('CONNECTION', (), {'__repr__': lambda self: 'CONNECTION'})()
+PARAMS     = type('PARAMS',     (), {'__repr__': lambda self: 'PARAMS'})()
 
-
+# Common args for query authentication
 STD_AUTH_ARGS = [
         Arg('-I', '--access-key-id', dest='aws_access_key_id',
             metavar='KEY_ID', route_to=CONNECTION),
