@@ -192,8 +192,9 @@ class BaseCommand(object):
     def __add_arg_to_cli_parser(self, arglike_obj, parser):
         if isinstance(arglike_obj, Arg):
             arg = parser.add_argument(*arglike_obj.pargs, **arglike_obj.kwargs)
-            self._arg_routes.setdefault(arglike_obj.route, [])
-            self._arg_routes[arglike_obj.route].append(arg.dest)
+            route = getattr(arglike_obj, 'route', self.DefaultRoute)
+            self._arg_routes.setdefault(route, [])
+            self._arg_routes[route].append(arg.dest)
         elif isinstance(arglike_obj, MutuallyExclusiveArgList):
             exgroup = parser.add_mutually_exclusive_group(
                     required=arglike_obj.required)

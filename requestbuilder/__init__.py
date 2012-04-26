@@ -27,7 +27,8 @@ class Arg(object):
     '''
 
     def __init__(self, *pargs, **kwargs):
-        self.route  = kwargs.pop('route_to', PARAMS)
+        if 'route_to' in kwargs:
+            self.route  = kwargs.pop('route_to')
         self.pargs  = pargs
         self.kwargs = kwargs
 
