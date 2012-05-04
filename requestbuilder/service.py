@@ -48,11 +48,11 @@ class BaseService(boto.connection.AWSAuthConnection):
         self._init_args.setdefault('port',     self.Port)
         self._init_args.setdefault('provider', self.Provider)
         if 'host' not in self._init_args:
-            raise MissingCredentialsError()
+            raise ConnectionSetupError('no host to connect to was given')
         try:
             boto.connection.AWSAuthConnection.__init__(self, **self._init_args)
         except boto.exception.NoAuthHandlerFound:
-            raise MissingCredentialsError()
+            raise ConnectionSetupError('failed to find credentials')
 
     def find_credentials(self):
         '''
@@ -111,7 +111,6 @@ class BaseService(boto.connection.AWSAuthConnection):
     def _required_auth_capability(self):
         return [self.Authentication]
 
-class MissingCredentialsError(boto.exception.BotoClientError):
-    def __init__(self):
-        boto.exception.BotoClientError.__init__(self,
-                                                'Failed to find credentials')
+class ConnectionSetupError(boto.exception.BotoClientError):
+    def __init__(self, message=''):
+        boto.exception.BotoClientError.__init__(self, message)

@@ -17,7 +17,7 @@ import sys
 
 from . import EMPTY, CONNECTION, PARAMS
 from .command import BaseCommand
-from .service import BaseService, MissingCredentialsError
+from .service import BaseService, ConnectionSetupError
 
 class BaseRequest(BaseCommand):
     '''
@@ -252,8 +252,8 @@ class BaseRequest(BaseCommand):
         if isinstance(err, self.ServiceClass.ResponseError):
             sys.exit('error ({code}) {msg}'.format(code=err.error_code,
                                                    msg=err.error_message))
-        elif isinstance(err, MissingCredentialsError):
-            sys.exit('error: unable to find credentials')
+        elif isinstance(err, ConnectionSetupError):
+            sys.exit('error: ' + err.message)
         else:
             BaseCommand._handle_cli_exception(self, err)
 
