@@ -124,8 +124,9 @@ class BaseCommand(object):
         that is stored to self._cli_parser and to populate the argument routing
         table.
         '''
-        self._cli_parser = argparse.ArgumentParser(
-                description='\n'.join(textwrap.wrap(self.Description)),
+        description = '\n\n'.join([textwrap.fill(textwrap.dedent(para))
+                                   for para in self.Description.split('\n\n')])
+        self._cli_parser = argparse.ArgumentParser(description=description,
                 formatter_class=argparse.RawDescriptionHelpFormatter)
         for arg_obj in self.Args:
             self.__add_arg_to_cli_parser(arg_obj, self._cli_parser)
