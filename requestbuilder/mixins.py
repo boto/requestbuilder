@@ -36,9 +36,10 @@ class TabifyingCommand(BaseCommand):
     associated --show-empty-fields command line arg.
     '''
 
-    Args = [Arg('--show-empty-fields', action='store_true', route_to=None)]
+    Args = [Arg('--show-empty-fields', action='store_true', route_to=None,
+                help='show empty columns as "(nil)"')]
 
-    def tabify(self, fields, include=[]):
+    def tabify(self, fields, include=None):
         '''
         Join a list of strings with tabs.  Nonzero items that Python considers
         false are printed as-is if they appear in the include list, replaced
@@ -46,7 +47,7 @@ class TabifyingCommand(BaseCommand):
         line, and omitted otherwise.
         '''
         def allowable(item):
-            return bool(item) or item is 0 or item in include
+            return bool(item) or item is 0 or item in (include or [])
 
         if self.args['show_empty_fields']:
             fstr = '(nil)'
