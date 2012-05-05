@@ -59,9 +59,9 @@ class MutuallyExclusiveArgList(list):
 
 class Filter(object):
     '''
-    An AWS API filter.  For APIs that support filtering by key/value
+    An AWS API filter.  For APIs that support filtering by name/value
     pairs, adding a Filter to a request's list of filters will allow a
-    user to send an output filter to the server with '--filter key=value'
+    user to send an output filter to the server with '--filter name=value'
     at the command line.
 
     The value specified by the 'dest' argument (or the 'name' argument,
@@ -78,17 +78,17 @@ class Filter(object):
 
     def convert(self, argval):
         '''
-        Given an argument to --filter of the form "<key>=<value>", convert
+        Given an argument to --filter of the form "<name>=<value>", convert
         the value to the appropriate type by calling self.type on it, then
-        return a (key, converted_value) tuple.  If the value's type conversion
+        return a (name, converted_value) tuple.  If the value's type conversion
         doesn't work then an ArgumentTypeError will result.  If the conversion
         succeeds but does not appear in self.choices when it exists, an
         ArgumentTypeError will result as well.
         '''
         if '=' not in argval:
-            msg = 'filter {0} must have format "KEY=VALUE"'.format(argval)
+            msg = 'filter {0} must have format "NAME=VALUE"'.format(argval)
             raise argparse.ArgumentTypeError(msg)
-        (key, value_str) = argval.split('=', 1)
+        (name, value_str) = argval.split('=', 1)
         try:
             value = self.type(value_str)
         except ValueError:
@@ -99,7 +99,7 @@ class Filter(object):
             msg = 'filter value {0} must match one of {1}'.format(
                     value, ', '.join([str(choice) for choice in self.choices]))
             raise argparse.ArgumentTypeError(msg)
-        return (key, value)
+        return (name, value)
 
 
 class GenericTagFilter(Filter):

@@ -131,8 +131,9 @@ class BaseCommand(object):
         for arg_obj in self.Args:
             self.__add_arg_to_cli_parser(arg_obj, self._cli_parser)
         if self.Filters:
-            self._cli_parser.add_argument('--filter', metavar='KEY=VALUE',
-                    action='append', dest='_filters', help='filter output',
+            self._cli_parser.add_argument('--filter', metavar='NAME=VALUE',
+                    action='append', dest='_filters',
+                    help='restrict results to resources that meet criteria',
                     type=partial(_parse_filter, filter_objs=self.Filters))
             self._arg_routes.setdefault(None, [])
             self._arg_routes[None].append('_filters')
@@ -217,7 +218,7 @@ class BaseCommand(object):
         max_len = 24
         col_len = max([len(filter_obj.name) for filter_obj in self.Filters
                        if len(filter_obj.name) < max_len]) - 1
-        helplines = ['available filters:']
+        helplines = ['available filter names:']
         for filter_obj in self.Filters:
             if filter_obj.help:
                 if len(filter_obj.name) <= col_len:
