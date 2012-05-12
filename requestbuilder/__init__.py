@@ -112,7 +112,8 @@ class GenericTagFilter(Filter):
 
 ########## SINGLETONS ##########
 # Indicates a parameter that should be sent to the server without a value
-EMPTY = type('EMPTY', (), {'__repr__': lambda self: "''"})()
+EMPTY = type('EMPTY', (), {'__repr__': lambda self: "''",
+                           '__str__':  lambda self: ''})()
 
 # Constants (enums?) used for arg routing
 CONNECTION = type('CONNECTION', (), {'__repr__': lambda self: 'CONNECTION'})()
