@@ -14,9 +14,9 @@
 
 import argparse
 import bdb
-import boto
 from functools import partial
 import json
+import logging
 import pprint
 import sys
 import textwrap
@@ -99,6 +99,23 @@ class BaseCommand(object):
 
         self._parse_arg_lists()
 
+        self._configure_logging()
+
+    def _configure_logging(self):
+        self.log = logging.getLogger(self.name)
+        if self.debug:
+            self.log.setLevel(logging.DEBUG)
+
+            # Attempt to have logging capture warnings as well (requires 2.7)
+            try:
+                logging.captureWarnings(True)
+            except AttributeError:
+                pass
+
+    @property
+    def name(self):
+        return self.__class__.__name__
+
     def print_result(self, data):
         '''
         Format data for printing at the command line and print it to standard
@@ -150,8 +167,6 @@ class BaseCommand(object):
         for (key, val) in cli_args.iteritems():
             self.args.setdefault(key, val)
 
-        if self.args.get('debug'):
-            boto.set_stream_logger(self.name())
         if self.args.get('debugger'):
             sys.excepthook = _requestbuilder_except_hook(
                     self.args.get('debugger', False),
@@ -177,19 +192,28 @@ class BaseCommand(object):
         result to print_result.
         '''
         try:
+            _configure_root_logger()
+            ##XXX logging.basicConfig(format=logfmt, level=100)
             self.process_cli_args()  # self.args is populated
             response = self.main()
             self.print_result(response)
         except Exception as err:
             self._handle_cli_exception(err)
 
-    def _handle_cli_exception(self, err):
-        if self.args.get('debug'):
-            raise
-        if '--debug' in sys.argv or '-D' in sys.argv:
+    @property
+    def debug(self):
+        if self.args.get('debug') or self.args.get('debugger'):
+            return True
+        if any(arg in sys.argv for arg in ('--debug', '-D', '--debugger')):
             # In case an error occurs during argument parsing
+            return True
+        return False
+
+    def _handle_cli_exception(self, err):
+        print >> sys.stderr, 'error: {0}'.format(err)
+        if self.debug:
             raise
-        sys.exit('error: {0}'.format(err))
+        sys.exit(1)
 
     def __add_arg_to_cli_parser(self, arglike_obj, parser):
         if isinstance(arglike_obj, Arg):
@@ -212,6 +236,10 @@ class BaseCommand(object):
         self.Filters.  The result is meant to be used as command line help
         output.
         '''
+        if '-h' not in sys.argv and '--help' not in sys.argv:
+            # Performance optimization
+            return ''
+
         ## FIXME:  This code has a bug with triple-quoted strings that contain
         ##         embedded indentation.  textwrap.dedent doesn't seem to help.
         ##         Reproducer: 'whether the   volume will be deleted'
@@ -296,3 +324,39 @@ def _requestbuilder_except_hook(debugger_enabled, debug_enabled):
             print value
             sys.exit(1)
     return excepthook
+
+def _configure_root_logger():
+    logfmt = '%(asctime)s %(name)s [%(levelname)s] %(message)s'
+    rootlogger = logging.getLogger('')
+    handler    = ProgressiveStreamHandler()
+    formatter  = logging.Formatter(logfmt)
+    handler.setFormatter(formatter)
+    rootlogger.addHandler(handler)
+    rootlogger.setLevel(100)
+
+class ProgressiveStreamHandler(logging.StreamHandler):
+    '''
+    A handler class that allows the "cursor" to stay on one line for selected
+    messages
+    '''
+
+    appending = False
+
+    def emit(self, record):
+        try:
+            msg = self.format(record)
+            append_requested = getattr(record, 'append', False)
+            if self.appending and not append_requested:
+                self.stream.write(getattr(self, 'terminator', '\n'))
+            self.stream.write(msg)
+            if append_requested:
+                self.appending = True
+            else:
+                # Might as well write the terminator immediately
+                self.stream.write(getattr(self, 'terminator', '\n'))
+                self.appending = False
+            self.flush()
+        except (KeyboardInterrupt, SystemExit):
+            raise
+        except Exception:
+            self.handleError(record)

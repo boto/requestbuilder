@@ -12,12 +12,19 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
 # OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-import boto.jsonresponse
+import logging
 import sys
+#try:
+#    import cStringIO as StringIO
+#except ImportError:
+#    import StringIO
+import StringIO
 
-from . import EMPTY, CONNECTION, PARAMS
+from . import EMPTY, AUTH, PARAMS, SERVICE, SESSION
 from .command import BaseCommand
-from .service import BaseService, ConnectionSetupError
+from .exceptions import ClientError, ServerError
+from .service import BaseService
+from .xmlparse import parse_listdelimited_aws_xml
 
 class BaseRequest(BaseCommand):
     '''
@@ -69,6 +76,7 @@ class BaseRequest(BaseCommand):
 
     DefaultRoute = PARAMS
 
+    @property
     def name(self):
         '''
         The name of this action.  Used when choosing what to supply for the
@@ -85,34 +93,33 @@ class BaseRequest(BaseCommand):
         self.headers   = None
         self.params    = None
         self.post_data = None
-        self.verb      = 'GET'
+        self.method    = 'GET'
 
         # HTTP response obtained from the server
         self.http_response = None
 
-        self._connection = None
+        self._service = None
 
     @property
-    def connection(self):
-        if self._connection is None:
-            conn_args = {}
+    def service(self):
+        if self._service is None:
+            service_args = {
+                    'auth_args':    {},
+                    'session_args': {}}
             for (key, val) in self.args.iteritems():
-                if key in self._arg_routes.get(CONNECTION, []):
-                    conn_args[key] = val
-            self._connection = self.ServiceClass(**conn_args)
-        return self._connection
+                if key in self._arg_routes.get(SERVICE, []):
+                    service_args[key] = val
+                elif key in self._arg_routes.get(AUTH, []):
+                    service_args['auth_args'] = val
+                elif key in self._arg_routes.get(SESSION, []):
+                    service_args['session_args'] = val
+            self._service = self.ServiceClass(self.log, **service_args)
+        return self._service
 
     @property
     def status(self):
         if self.http_response is not None:
             return self.http_response.status
-        else:
-            return None
-
-    @property
-    def reason(self):
-        if self.http_response is not None:
-            return self.http_response.reason
         else:
             return None
 
@@ -199,43 +206,57 @@ class BaseRequest(BaseCommand):
          1. Build a flattened dict of params suitable for submission as HTTP
             request parameters, based first upon the content of self.params,
             and second upon everything in self.args that routes to PARAMS.
-         2. Send an HTTP request via self.connection with the HTTP verb given
-            in self.verb using query parameters from the aforementioned
+         2. Send an HTTP request via self.service with the HTTP method given
+            in self.method using query parameters from the aforementioned
             flattened dict, headers based on self.headers, and POST data based
             on self.post_data.
          3. If the response's status code indicates success, parse the
-            response's body with self.parse_http_response and return the
-            result.
+            response's body with self.parse_response and return the result.
          4. If the response's status code does not indicate success, log an
-            error and raise a ResponseError.
+            error and raise a ServerError.
         '''
         params =      self.flatten_params(self.args,   PARAMS)
         params.update(self.flatten_params(self.params, _ALWAYS))
         if self.headers:
-            boto.log.debug('Request headers: {0}'.format(self.headers))
+            self.log.debug('request headers: {0}'.format(self.headers))
         if params:
-            boto.log.debug('Request params: {0}'.format(params))
-        self.http_response = self.connection.make_request(self.name(),
-                verb=self.verb, headers=self.headers, params=params,
+            self.log.debug('request params:  {0}'.format(params))
+        self.http_response = self.service.make_request(self.name,
+                method=self.method, headers=self.headers, params=params,
                 data=self.post_data, api_version=self.APIVersion)
-        response_body = self.http_response.read()
-        boto.log.debug(response_body)
-        if 200 <= self.http_response.status < 300:
-            return self.parse_http_response(response_body)
-        else:
-            boto.log.error('{0} {1}'.format(self.http_response.status,
-                                            self.http_response.reason))
-            boto.log.error(response_body)
-            raise self.connection.ResponseError(self.http_response.status,
-                                                self.http_response.reason,
-                                                response_body)
+        self.log.debug('response status:  {0}'.format(
+                self.http_response.status_code))
+        try:
+            if 200 <= self.http_response.status_code < 300:
+                return self.parse_response(self.http_response)
+            else:
+                self.log.error('response content: %s',
+                               self.http_response.text)
+                raise ServerError(self.http_response.status_code,
+                                  self.http_response.text)
+        finally:
+            # Empty the socket buffer so it can be reused
+            self.http_response.content
 
-    def parse_http_response(self, response_body):
-        response = boto.jsonresponse.Element(list_marker=self.ListMarkers,
-                                             item_marker=self.ItemMarkers)
-        handler = boto.jsonresponse.XmlHandler(response, self)
-        handler.parse(response_body)
-        return response[response.keys()[0]]  # Strip off the root element
+    def parse_response(self, response):
+        ## XXX:  EC2-like version
+        # We do some extra handling here to log stuff as it comes in rather
+        # than reading it all into memory at once.
+        self.log.debug('response content:', extra={'append': True})
+        print '>>>', self.http_response.raw
+        # Using Response.iter_content gives us automatic decoding, but we then
+        # have to make the generator look like a file so etree can use it.
+        with _IteratorFileObjAdapter(self.http_response.iter_content(16384)) \
+                as content_fileobj:
+            # Using Response.iter_content gives us automatic decoding, but we
+            # then have to make the generator look like a file so etree can
+            # use it.
+            logged_fileobj = _ReadLoggingWrapper(content_fileobj, self.log,
+                                                 logging.DEBUG)
+            response_dict = parse_listdelimited_aws_xml(logged_fileobj,
+                                                        self.ListMarkers)
+            ## TODO:  rename ListMarkers -> ListDelims globally
+        return response_dict[response_dict.keys()[0]]  # Strip the root elem
 
     def main(self):
         '''
@@ -249,12 +270,60 @@ class BaseRequest(BaseCommand):
         return self.send()
 
     def _handle_cli_exception(self, err):
-        if isinstance(err, self.ServiceClass.ResponseError):
-            sys.exit('error ({code}) {msg}'.format(code=err.error_code,
-                                                   msg=err.error_message))
-        elif isinstance(err, ConnectionSetupError):
-            sys.exit('error: ' + err.message)
+        if isinstance(err, ServerError):
+            print >> sys.stderr, 'error ({code}) {reason}'.format(
+                    code=err.code, reason=err.reason or '')
+            if self.debug:
+                raise
+            sys.exit(1)
         else:
             BaseCommand._handle_cli_exception(self, err)
+
+class _IteratorFileObjAdapter(object):
+    def __init__(self, source):
+        self._source = source
+        self._buf    = StringIO.StringIO()
+        self._closed = False
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.close()
+
+    @property
+    def closed(self):
+        return self._closed
+
+    def close(self):
+        if not self._closed:
+            self._buf.close()
+            self._closed = True
+
+    def read(self, size=-1):
+        if size < 0:
+            for chunk in self._source:
+                self._buf.write(chunk)
+            return self._buf.read()
+        else:
+            while self._buf.len < size:
+                try:
+                    self._buf.write(next(self._source))
+                except StopIteration:
+                    break
+            return self._buf.read(size)
+
+class _ReadLoggingWrapper(object):
+    def __init__(self, fileobj, logger, level):
+        self.fileobj = fileobj
+        self.logger  = logger
+        self.level   = level
+
+    def read(self, size=-1):
+        print '\n>>> read called with size', size
+        chunk = self.fileobj.read(size)
+        self.logger.log(self.level, chunk, extra={'append': True})
+        print '\n>>> CHUNK:', repr(chunk)
+        return chunk
 
 _ALWAYS = type('_ALWAYS', (), {'__repr__': lambda self: '_ALWAYS'})()

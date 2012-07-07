@@ -116,12 +116,13 @@ EMPTY = type('EMPTY', (), {'__repr__': lambda self: "''",
                            '__str__':  lambda self: ''})()
 
 # Constants (enums?) used for arg routing
-CONNECTION = type('CONNECTION', (), {'__repr__': lambda self: 'CONNECTION'})()
-PARAMS     = type('PARAMS',     (), {'__repr__': lambda self: 'PARAMS'})()
+AUTH    = type('AUTH',    (), {'__repr__': lambda self: 'AUTH'})()
+PARAMS  = type('PARAMS',  (), {'__repr__': lambda self: 'PARAMS'})()
+SERVICE = type('SERVICE', (), {'__repr__': lambda self: 'SERVICE'})()
+SESSION = type('SESSION', (), {'__repr__': lambda self: 'SESSION'})()
 
 # Common args for query authentication
 STD_AUTH_ARGS = [
-        Arg('-I', '--access-key-id', dest='aws_access_key_id',
-            metavar='KEY_ID', route_to=CONNECTION),
-        Arg('-S', '--secret-key', dest='aws_secret_access_key', metavar='KEY',
-            route_to=CONNECTION)]
+        Arg('-I', '--access-key-id', dest='key_id', metavar='KEY_ID',
+            route_to=AUTH),
+        Arg('-S', '--secret-key', dest='key', metavar='KEY', route_to=AUTH)]

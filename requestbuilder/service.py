@@ -12,48 +12,65 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
 # OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-import boto.connection
-import boto.exception
+import copy
 import os.path
+import random
+import requests.exceptions
+import time
 import urlparse
 
-class BaseService(boto.connection.AWSAuthConnection):
+from .auth import QuerySignatureV2Auth
+from .exceptions import ClientError, ServiceInitError
+
+class BaseService(object):
+    Name = 'base'
     Description = ''
     APIVersion = ''
+    MaxRetries = 4
 
-    Authentication = 'sign-v2'
-    Path = '/'
-    Port = 443
-    Provider = 'aws'
-    EnvURL = 'AWS_URL'
-    ResponseError = boto.exception.BotoServerError
+    AuthClass = QuerySignatureV2Auth
+    EnvURL  = 'AWS_URL'  # endpoint URL
 
-    # Endpoint names (i.e. 'us-east-1') and their URLs
-    Endpoints = {}
+    # Region names (i.e. 'us-east-1') and their endpoints for this service
+    ## TODO:  replace this with a config-based system
+    Regions = {}
 
-    def __init__(self, **kwargs):
-        self._init_args = kwargs
+    def __init__(self, log, endpoint=None, region_name=None, auth_args=None,
+                 session_args=None):
+        self.log           = log.getChild(self.__class__.__name__)
+        # The region name currently only matters for sigv4.
+        ## FIXME:  It also won't work with every config source yet.
+        self.endpoint      = endpoint
+        self.region_name   = region_name
+        self._auth_args    = auth_args    or {}
+        self._session_args = session_args or {}
 
+        # Grab info from the command line or service-specific config
         self.find_credentials()
-        # We do this now in case find_credentials wants to add a url
-        url = self._init_args.pop('url', None)
-        self._read_url_info(url or os.getenv(self.EnvURL))
-        if self.Endpoints:
-            if 'region_name' in self._init_args:
-                endpoint = self.Endpoints.get(self._init_args['region_name'])
-                self._read_url_info(endpoint)
-            else:
-                self._read_url_info(self.Endpoints.values()[0])
-        self._init_args.setdefault('path',     self.Path)
-        self._init_args.setdefault('port',     self.Port)
-        self._init_args.setdefault('provider', self.Provider)
-        if 'host' not in self._init_args:
-            raise ConnectionSetupError('no host to connect to was given')
-        try:
-            boto.connection.AWSAuthConnection.__init__(self, **self._init_args)
-        except boto.exception.NoAuthHandlerFound:
-            raise ConnectionSetupError('failed to find credentials')
 
+        # Try the environment next
+        if self.EnvURL in os.environ:
+            self.__set_missing(os.getenv(self.EnvURL, '__env__'))
+
+        ## TODO:  switch to a config-based system for obtaining region info
+        if region_name:
+            if region_name in self.Regions:
+                self.__set_missing(self.Regions[region_name], region_name)
+            else:
+                raise ServiceInitError('no such region: ' + region_name)
+        elif self.Regions:
+            ## TODO:  have a way of choosing a default region
+            self.__set_missing(self.Regions[self.region],
+                               self.Regions.keys()[0])
+        if not self.endpoint:
+            raise ServiceInitError('no endpoint to connect to was given')
+
+        ## TODO:  deal with AuthClass-setup-related exceptions
+        ## TODO:  retry on certain 5xx errors
+        auth = self.AuthClass(self, **self._auth_args)
+        self.session = requests.session(auth=auth, **self._session_args)
+
+    ## TODO:  rename this function
     def find_credentials(self):
         '''
         If the 'AWS_CREDENTIAL_FILE' environment variable exists, parse that
@@ -70,47 +87,70 @@ class BaseService(boto.connection.AWSAuthConnection):
                     if '=' in line:
                         (key, val) = line.split('=', 1)
                         if key.strip() == 'AWSAccessKeyId':
-                            self._init_args.setdefault('aws_access_key_id',
-                                                       val.strip())
+                            self._auth_args.setdefault('key_id', val.strip())
                         elif key.strip() == 'AWSSecretKey':
-                            self._init_args.setdefault('aws_secret_access_key',
-                                                       val.strip())
+                            self._auth_args.setdefault('key', val.strip())
 
-    def make_request(self, action, verb='GET', path='/', params=None,
-                     headers=None, data='', api_version=None):
-        request = self.build_base_http_request(verb, path, None, params,
-                                               headers or {}, data)
+    def make_request(self, action, method='GET', path=None, params=None,
+                     headers=None, data=None, api_version=None):
+        params = params or {}
         if action:
-            request.params['Action'] = action
+            params['Action'] = action
         if api_version:
-            request.params['Version'] = api_version
+            params['Version'] = api_version
         elif self.APIVersion:
-            request.params['Version'] = self.APIVersion
-        return self._mexe(request)
+            params['Version'] = self.APIVersion
 
-    def _read_url_info(self, url):
-        '''
-        Parse a URL and use it to fill in is_secure, host, port, and path if
-        any are missing.
-        '''
-        if url:
-            parse_result = urlparse.urlparse(url)
-            if parse_result[0] == 'https':
-                self._init_args.setdefault('is_secure', True)
-            else:
-                self._init_args.setdefault('is_secure', False)
-            if ':' in parse_result[1]:
-                (host, port) = parse_result[1].rsplit(':', 1)
-                self._init_args.setdefault('host', host)
-                self._init_args.setdefault('port', int(port))
-            else:
-                self._init_args.setdefault('host', parse_result[1])
-            if parse_result[2]:
-                self._init_args.setdefault('path', parse_result[2])
+        if path:
+            ## FIXME: this is going to break when path is /
+            ## TODO: test other cases
+            url = urlparse.urljoin(self.endpoint, path)
+        else:
+            url = self.endpoint
 
-    def _required_auth_capability(self):
-        return [self.Authentication]
+        self.log.debug('method:  %s', method)
+        self.log.debug('url:     %s', url)
+        self.log.debug('params:  %s', params)
+        self.log.debug('headers: %s', headers)
 
-class ConnectionSetupError(boto.exception.BotoClientError):
-    def __init__(self, message=''):
-        boto.exception.BotoClientError.__init__(self, message)
+        hooks = {'response':     _log_response_metadata(self.log),
+                 'post_request': RetryOnStatuses((500, 503), self.MaxRetries,
+                                                  logger=self.log)}
+
+        try:
+            return self.session.request(method=method, url=url, params=params,
+                                        data=data, headers=headers, hooks=hooks)
+        except requests.exceptions.RequestException as exc:
+            raise ClientError(exc.message, exc)
+
+    def __set_missing(self, endpoint=None, region_name=None):
+        self.endpoint    = self.endpoint    or endpoint
+        self.region_name = self.region_name or region_name
+
+class RetryOnStatuses(object):
+    def __init__(self, statuses, max_retries, logger=None):
+        self.statuses    = statuses
+        self.max_retries = max_retries
+        self.current_try = 0
+        self.logger      = logger
+
+    def __call__(self, request):
+        if (request.response.status_code in self.statuses and
+            self.current_try < self.max_retries):
+            # Exponential backoff
+            self.current_try += 1
+            delay = (1 + random.random()) ** self.current_try
+            if self.logger:
+                self.logger.info('Retrying after %.3f seconds', delay)
+            time.sleep((1 + random.random()) ** self.current_try)
+            orig_response = request.response
+            request.send(anyway=True)
+            request.response.history = (orig_response.history +
+                    [orig_response] + request.response.history)
+
+def _log_response_metadata(logger):
+    def __log_response_metadata(response):
+        logger.debug('response status: %i', response.status_code)
+        for key, val in (response.headers or {}).items():
+            logger.debug('response header: %s: %s', key, val)
+    return __log_response_metadata
