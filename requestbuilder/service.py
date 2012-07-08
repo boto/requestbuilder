@@ -86,10 +86,12 @@ class BaseService(object):
                     line = line.split('#', 1)[0]
                     if '=' in line:
                         (key, val) = line.split('=', 1)
-                        if key.strip() == 'AWSAccessKeyId':
-                            self._auth_args.setdefault('key_id', val.strip())
-                        elif key.strip() == 'AWSSecretKey':
-                            self._auth_args.setdefault('key', val.strip())
+                        if (key.strip() == 'AWSAccessKeyId' and
+                            not self._auth_args.get('key_id')):
+                            self._auth_args['key_id'] = val.strip()
+                        elif (key.strip() == 'AWSSecretKey' and
+                              not self._auth_args.get('key')):
+                            self._auth_args['key'] = val.strip()
 
     def make_request(self, action, method='GET', path=None, params=None,
                      headers=None, data=None, api_version=None):
