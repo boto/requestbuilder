@@ -12,6 +12,8 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
 # OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
+from __future__ import absolute_import
+
 import argparse
 import bdb
 from functools import partial
@@ -28,6 +30,7 @@ except ImportError:
     import pdb
 
 from . import __version__, Arg, MutuallyExclusiveArgList
+from .logging import configure_root_logger
 
 class InheritableCommandClass(type):
     '''
@@ -192,8 +195,7 @@ class BaseCommand(object):
         result to print_result.
         '''
         try:
-            _configure_root_logger()
-            ##XXX logging.basicConfig(format=logfmt, level=100)
+            configure_root_logger()
             self.process_cli_args()  # self.args is populated
             response = self.main()
             self.print_result(response)
@@ -324,39 +326,3 @@ def _requestbuilder_except_hook(debugger_enabled, debug_enabled):
             print value
             sys.exit(1)
     return excepthook
-
-def _configure_root_logger():
-    logfmt = '%(asctime)s %(name)s [%(levelname)s] %(message)s'
-    rootlogger = logging.getLogger('')
-    handler    = ProgressiveStreamHandler()
-    formatter  = logging.Formatter(logfmt)
-    handler.setFormatter(formatter)
-    rootlogger.addHandler(handler)
-    rootlogger.setLevel(100)
-
-class ProgressiveStreamHandler(logging.StreamHandler):
-    '''
-    A handler class that allows the "cursor" to stay on one line for selected
-    messages
-    '''
-
-    appending = False
-
-    def emit(self, record):
-        try:
-            msg = self.format(record)
-            append_requested = getattr(record, 'append', False)
-            if self.appending and not append_requested:
-                self.stream.write(getattr(self, 'terminator', '\n'))
-            self.stream.write(msg)
-            if append_requested:
-                self.appending = True
-            else:
-                # Might as well write the terminator immediately
-                self.stream.write(getattr(self, 'terminator', '\n'))
-                self.appending = False
-            self.flush()
-        except (KeyboardInterrupt, SystemExit):
-            raise
-        except Exception:
-            self.handleError(record)

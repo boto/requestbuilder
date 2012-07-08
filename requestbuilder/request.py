@@ -12,13 +12,10 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
 # OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
+from __future__ import absolute_import
+
 import logging
 import sys
-#try:
-#    import cStringIO as StringIO
-#except ImportError:
-#    import StringIO
-import StringIO
 
 from . import EMPTY, AUTH, PARAMS, SERVICE, SESSION
 from .command import BaseCommand
@@ -71,8 +68,7 @@ class BaseRequest(BaseCommand):
     APIVersion   = None
     Action       = None
 
-    ListMarkers  = []
-    ItemMarkers  = []
+    ListDelims = []
 
     DefaultRoute = PARAMS
 
@@ -88,8 +84,8 @@ class BaseRequest(BaseCommand):
         BaseCommand.__init__(self, **kwargs)
 
         # Parts of the HTTP request to be sent to the server.
-        # Note that self.flatten_params will update self.params for each entry
-        # in self.args that routes to PARAMS.
+        # Note that self.serialize_params will update self.params for each
+        # entry in self.args that routes to PARAMS.
         self.headers   = None
         self.params    = None
         self.post_data = None
@@ -103,9 +99,8 @@ class BaseRequest(BaseCommand):
     @property
     def service(self):
         if self._service is None:
-            service_args = {
-                    'auth_args':    {},
-                    'session_args': {}}
+            service_args = {'auth_args':    {},
+                            'session_args': {}}
             for (key, val) in self.args.iteritems():
                 if key in self._arg_routes.get(SERVICE, []):
                     service_args[key] = val
@@ -123,7 +118,7 @@ class BaseRequest(BaseCommand):
         else:
             return None
 
-    def flatten_params(self, args, route, prefix=None):
+    def serialize_params(self, args, route, prefix=None):
         '''
         Given a possibly-nested dict of args and an arg routing destination,
         transform each element in the dict that matches the corresponding
@@ -170,8 +165,8 @@ class BaseRequest(BaseCommand):
                         prefixed_key = str(key)
 
                     if isinstance(val, dict) or isinstance(val, list):
-                        flattened.update(self.flatten_params(val, _ALWAYS,
-                                                             prefixed_key))
+                        flattened.update(self.serialize_params(val, _ALWAYS,
+                                                               prefixed_key))
                     elif isinstance(val, file):
                         flattened[prefixed_key] = val.read()
                     elif val or val is 0:
@@ -187,8 +182,8 @@ class BaseRequest(BaseCommand):
                     prefixed_key = str(i_item)
 
                 if isinstance(item, dict) or isinstance(item, list):
-                    flattened.update(self.flatten_params(item, _ALWAYS,
-                                                         prefixed_key))
+                    flattened.update(self.serialize_params(item, _ALWAYS,
+                                                           prefixed_key))
                 elif isinstance(item, file):
                     flattened[prefixed_key] = item.read()
                 elif item or item == 0:
@@ -203,60 +198,58 @@ class BaseRequest(BaseCommand):
         '''
         Send a request to the server and return its response.  More precisely:
 
-         1. Build a flattened dict of params suitable for submission as HTTP
-            request parameters, based first upon the content of self.params,
-            and second upon everything in self.args that routes to PARAMS.
+         1. Build a dict of params suitable for submission as HTTP request
+            parameters, based first upon the content of self.params, and
+            second upon everything in self.args that routes to PARAMS.
          2. Send an HTTP request via self.service with the HTTP method given
             in self.method using query parameters from the aforementioned
-            flattened dict, headers based on self.headers, and POST data based
+            serialized dict, headers based on self.headers, and POST data based
             on self.post_data.
          3. If the response's status code indicates success, parse the
             response's body with self.parse_response and return the result.
          4. If the response's status code does not indicate success, log an
             error and raise a ServerError.
         '''
-        params =      self.flatten_params(self.args,   PARAMS)
-        params.update(self.flatten_params(self.params, _ALWAYS))
-        if self.headers:
-            self.log.debug('request headers: {0}'.format(self.headers))
-        if params:
-            self.log.debug('request params:  {0}'.format(params))
+        params =      self.serialize_params(self.args,   PARAMS)
+        params.update(self.serialize_params(self.params, _ALWAYS))
         self.http_response = self.service.make_request(self.name,
                 method=self.method, headers=self.headers, params=params,
                 data=self.post_data, api_version=self.APIVersion)
-        self.log.debug('response status:  {0}'.format(
-                self.http_response.status_code))
         try:
             if 200 <= self.http_response.status_code < 300:
                 return self.parse_response(self.http_response)
             else:
-                self.log.error('response content: %s',
+                self.log.error('-- response content --\n%s',
                                self.http_response.text)
+                self.log.error('-- end of response content --')
                 raise ServerError(self.http_response.status_code,
                                   self.http_response.text)
         finally:
             # Empty the socket buffer so it can be reused
-            self.http_response.content
+            try:
+                self.http_response.content
+            except RuntimeError:
+                # The content was already consumed
+                pass
 
     def parse_response(self, response):
-        ## XXX:  EC2-like version
+        # Parser for list-delimited responses like EC2's
+
         # We do some extra handling here to log stuff as it comes in rather
         # than reading it all into memory at once.
-        self.log.debug('response content:', extra={'append': True})
-        print '>>>', self.http_response.raw
+        self.log.debug('-- response content --\n', extra={'append': True})
         # Using Response.iter_content gives us automatic decoding, but we then
         # have to make the generator look like a file so etree can use it.
         with _IteratorFileObjAdapter(self.http_response.iter_content(16384)) \
                 as content_fileobj:
-            # Using Response.iter_content gives us automatic decoding, but we
-            # then have to make the generator look like a file so etree can
-            # use it.
-            logged_fileobj = _ReadLoggingWrapper(content_fileobj, self.log,
-                                                 logging.DEBUG)
+            logged_fileobj = _ReadLoggingFileWrapper(content_fileobj, self.log,
+                                                     logging.DEBUG)
             response_dict = parse_listdelimited_aws_xml(logged_fileobj,
-                                                        self.ListMarkers)
+                                                        self.ListDelims)
             ## TODO:  rename ListMarkers -> ListDelims globally
-        return response_dict[response_dict.keys()[0]]  # Strip the root elem
+        self.log.debug('-- end of response content --')
+        # Strip off the root element
+        return response_dict[response_dict.keys()[0]]
 
     def main(self):
         '''
@@ -281,9 +274,10 @@ class BaseRequest(BaseCommand):
 
 class _IteratorFileObjAdapter(object):
     def __init__(self, source):
-        self._source = source
-        self._buf    = StringIO.StringIO()
-        self._closed = False
+        self._source  = source
+        self._buflist = []
+        self._closed  = False
+        self._len     = 0
 
     def __enter__(self):
         return self
@@ -297,33 +291,43 @@ class _IteratorFileObjAdapter(object):
 
     def close(self):
         if not self._closed:
-            self._buf.close()
+            self.buflist = None
             self._closed = True
 
     def read(self, size=-1):
-        if size < 0:
+        if size is None or size < 0:
             for chunk in self._source:
-                self._buf.write(chunk)
-            return self._buf.read()
+                self._buflist.append(chunk)
+            result = ''.join(self._buflist)
+            self._buflist = []
+            self._len     = 0
         else:
-            while self._buf.len < size:
+            while self._len < size:
                 try:
-                    self._buf.write(next(self._source))
+                    chunk = next(self._source)
+                    self._buflist.append(chunk)
+                    self._len += len(chunk)
                 except StopIteration:
                     break
-            return self._buf.read(size)
+            result    = ''.join(self._buflist)
+            extra_len = len(result) - size
+            self._buflist = []
+            self._len     = 0
+            if extra_len > 0:
+                self._buflist = [result[-extra_len:]]
+                self._len     = extra_len
+                result = result[:-extra_len]
+        return result
 
-class _ReadLoggingWrapper(object):
+class _ReadLoggingFileWrapper(object):
     def __init__(self, fileobj, logger, level):
         self.fileobj = fileobj
         self.logger  = logger
         self.level   = level
 
     def read(self, size=-1):
-        print '\n>>> read called with size', size
         chunk = self.fileobj.read(size)
         self.logger.log(self.level, chunk, extra={'append': True})
-        print '\n>>> CHUNK:', repr(chunk)
         return chunk
 
 _ALWAYS = type('_ALWAYS', (), {'__repr__': lambda self: '_ALWAYS'})()

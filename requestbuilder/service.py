@@ -37,7 +37,7 @@ class BaseService(object):
 
     def __init__(self, log, endpoint=None, region_name=None, auth_args=None,
                  session_args=None):
-        self.log           = log.getChild(self.__class__.__name__)
+        self.log           = log
         # The region name currently only matters for sigv4.
         ## FIXME:  It also won't work with every config source yet.
         self.endpoint      = endpoint
@@ -108,10 +108,17 @@ class BaseService(object):
         else:
             url = self.endpoint
 
-        self.log.debug('method:  %s', method)
-        self.log.debug('url:     %s', url)
-        self.log.debug('params:  %s', params)
-        self.log.debug('headers: %s', headers)
+        self.log.debug('request method: %s', method)
+        self.log.debug('request url:    %s', url)
+        if isinstance(headers, dict):
+            for key, val in sorted(headers.iteritems()):
+                self.log.debug('request header: %s: %s', key, val)
+        if isinstance(params, dict):
+            for key, val in sorted(params.iteritems()):
+                self.log.debug('request param:  %s: %s', key, val)
+        if isinstance(data, dict):
+            for key, val in sorted(data.iteritems()):
+                self.log.debug('request data:   %s: %s', key, val)
 
         hooks = {'response':     _log_response_metadata(self.log),
                  'post_request': RetryOnStatuses((500, 503), self.MaxRetries,
@@ -151,6 +158,7 @@ class RetryOnStatuses(object):
 def _log_response_metadata(logger):
     def __log_response_metadata(response):
         logger.debug('response status: %i', response.status_code)
-        for key, val in (response.headers or {}).items():
-            logger.debug('response header: %s: %s', key, val)
+        if isinstance(response.headers, dict):
+            for key, val in sorted(response.headers.items()):
+                logger.debug('response header: %s: %s', key, val)
     return __log_response_metadata
