@@ -120,9 +120,9 @@ class BaseRequest(BaseCommand):
                 if key in self._arg_routes.get(SERVICE, []):
                     service_args[key] = val
                 elif key in self._arg_routes.get(AUTH, []):
-                    service_args['auth_args'] = val
+                    service_args['auth_args'][key] = val
                 elif key in self._arg_routes.get(SESSION, []):
-                    service_args['session_args'] = val
+                    service_args['session_args'][key] = val
             self._service = self.ServiceClass(self.log, **service_args)
         return self._service
 

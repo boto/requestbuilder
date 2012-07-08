@@ -14,9 +14,9 @@ class QuerySignatureV2Auth(requests.auth.AuthBase):
     def __init__(self, service, key_id, key, params_to_post=True):
         self.service = service
         if not key_id:
-            raise AuthError('missing key ID')
+            raise AuthError('missing access key ID')
         if not key:
-            raise AuthError('missing key')
+            raise AuthError('missing secret key')
         self.key_id = key_id
         self.hmac   = hmac.new(key, digestmod=hashlib.sha256)
         self.log    = self.service.log.getChild(self.__class__.__name__)
