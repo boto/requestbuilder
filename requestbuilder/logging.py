@@ -46,7 +46,7 @@ class ProgressiveStreamHandler(logging.StreamHandler):
             self.handleError(record)
 
 def configure_root_logger():
-    logfmt = '%(asctime)s %(levelname)-8s %(name)s %(message)s'
+    logfmt = '%(asctime)s %(levelname)-7s %(name)s %(message)s'
     rootlogger = logging.getLogger('')
     handler    = ProgressiveStreamHandler()
     formatter  = logging.Formatter(logfmt)

@@ -15,9 +15,10 @@
 from __future__ import absolute_import
 
 import logging
+import platform
 import sys
 
-from . import EMPTY, AUTH, PARAMS, SERVICE, SESSION
+from . import __version__, EMPTY, AUTH, PARAMS, SERVICE, SESSION
 from .command import BaseCommand
 from .exceptions import ClientError, ServerError
 from .service import BaseService
@@ -72,14 +73,6 @@ class BaseRequest(BaseCommand):
 
     DefaultRoute = PARAMS
 
-    @property
-    def name(self):
-        '''
-        The name of this action.  Used when choosing what to supply for the
-        Action query parameter.
-        '''
-        return self.Action or self.__class__.__name__
-
     def __init__(self, **kwargs):
         BaseCommand.__init__(self, **kwargs)
 
@@ -94,7 +87,29 @@ class BaseRequest(BaseCommand):
         # HTTP response obtained from the server
         self.http_response = None
 
-        self._service = None
+        self._service    = None
+        self._user_agent = None
+
+    @property
+    def name(self):
+        '''
+        The name of this action.  Used when choosing what to supply for the
+        Action query parameter.
+        '''
+        return self.Action or self.__class__.__name__
+
+    @property
+    def user_agent(self):
+        '''
+        Return a user-agent string for this program.
+        '''
+        if not self._user_agent:
+            template = 'requestbuilder/{ver} ({os} {osver}; {python} {pyver})'
+            self._user_agent = template.format(ver=__version__,
+                    os=platform.uname()[0], osver=platform.uname()[2],
+                    python=platform.python_implementation(),
+                    pyver=platform.python_version())
+        return self._user_agent
 
     @property
     def service(self):
@@ -212,16 +227,22 @@ class BaseRequest(BaseCommand):
         '''
         params =      self.serialize_params(self.args,   PARAMS)
         params.update(self.serialize_params(self.params, _ALWAYS))
+        headers = dict(self.headers or {})
+        headers.setdefault('User-Agent', self.user_agent)
+        self.log.debug('serialized params: %s', params)
         self.http_response = self.service.make_request(self.name,
-                method=self.method, headers=self.headers, params=params,
+                method=self.method, headers=headers, params=params,
                 data=self.post_data, api_version=self.APIVersion)
         try:
             if 200 <= self.http_response.status_code < 300:
-                return self.parse_response(self.http_response)
+                parsed = self.parse_response(self.http_response)
+                self.log.debug('result: success')
+                return parsed
             else:
-                self.log.error('-- response content --\n%s',
+                self.log.debug('-- response content --\n%s',
                                self.http_response.text)
-                self.log.error('-- end of response content --')
+                self.log.debug('-- end of response content --')
+                self.log.debug('result: failure')
                 raise ServerError(self.http_response.status_code,
                                   self.http_response.text)
         finally:

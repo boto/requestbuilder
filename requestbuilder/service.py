@@ -108,19 +108,8 @@ class BaseService(object):
         else:
             url = self.endpoint
 
-        self.log.debug('request method: %s', method)
-        self.log.debug('request url:    %s', url)
-        if isinstance(headers, dict):
-            for key, val in sorted(headers.iteritems()):
-                self.log.debug('request header: %s: %s', key, val)
-        if isinstance(params, dict):
-            for key, val in sorted(params.iteritems()):
-                self.log.debug('request param:  %s: %s', key, val)
-        if isinstance(data, dict):
-            for key, val in sorted(data.iteritems()):
-                self.log.debug('request data:   %s: %s', key, val)
-
-        hooks = {'response':     _log_response_metadata(self.log),
+        hooks = {'pre_send':     _log_request_data(self.log),
+                 'response':     _log_response_data(self.log),
                  'post_request': RetryOnStatuses((500, 503), self.MaxRetries,
                                                   logger=self.log)}
 
@@ -155,10 +144,25 @@ class RetryOnStatuses(object):
             request.response.history = (orig_response.history +
                     [orig_response] + request.response.history)
 
-def _log_response_metadata(logger):
-    def __log_response_metadata(response):
+def _log_request_data(logger):
+    def __log_request_data(request):
+        logger.debug('request method: %s', request.method)
+        logger.debug('request url:    %s', request.url)
+        if isinstance(request.headers, dict):
+            for key, val in sorted(request.headers.iteritems()):
+                logger.debug('request header: %s: %s', key, val)
+        if isinstance(request.params, dict):
+            for key, val in sorted(request.params.iteritems()):
+                logger.debug('request param:  %s: %s', key, val)
+        if isinstance(request.data, dict):
+            for key, val in sorted(request.data.iteritems()):
+                logger.debug('request data:   %s: %s', key, val)
+    return __log_request_data
+
+def _log_response_data(logger):
+    def __log_response_data(response):
         logger.debug('response status: %i', response.status_code)
         if isinstance(response.headers, dict):
             for key, val in sorted(response.headers.items()):
                 logger.debug('response header: %s: %s', key, val)
-    return __log_response_metadata
+    return __log_response_data
