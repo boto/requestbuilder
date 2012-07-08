@@ -22,7 +22,7 @@ class TabifyingCommand(BaseCommand):
     '''
 
     Args = [Arg('--show-empty-fields', action='store_true', route_to=None,
-                help='show empty columns as "(nil)"')]
+                help='show empty values as "(nil)"')]
 
     def tabify(self, fields, include=None):
         '''
