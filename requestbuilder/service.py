@@ -23,13 +23,13 @@ from .auth import QuerySignatureV2Auth
 from .exceptions import ClientError, ServiceInitError
 
 class BaseService(object):
-    Name = 'base'
+    Name        = 'base'
     Description = ''
-    APIVersion = ''
-    MaxRetries = 4
+    APIVersion  = ''
+    MaxRetries  = 4
 
     AuthClass = QuerySignatureV2Auth
-    EnvURL  = 'AWS_URL'  # endpoint URL
+    EnvURL    = 'AWS_URL'  # endpoint URL
 
     # Region names (i.e. 'us-east-1') and their endpoints for this service
     ## TODO:  replace this with a config-based system
@@ -37,7 +37,7 @@ class BaseService(object):
 
     def __init__(self, log, endpoint=None, region_name=None, auth_args=None,
                  session_args=None):
-        self.log           = log
+        self.log = log
         # The region name currently only matters for sigv4.
         ## FIXME:  It also won't work with every config source yet.
         self.endpoint      = endpoint
