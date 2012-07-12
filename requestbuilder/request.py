@@ -221,7 +221,7 @@ class BaseRequest(BaseCommand):
             serialized dict, headers based on self.headers, and POST data based
             on self.post_data.
          3. If the response's status code indicates success, parse the
-            response's body with self.parse_response and return the result.
+            response with self.parse_response and return the result.
          4. If the response's status code does not indicate success, log an
             error and raise a ServerError.
         '''
@@ -267,7 +267,6 @@ class BaseRequest(BaseCommand):
                                                      logging.DEBUG)
             response_dict = parse_listdelimited_aws_xml(logged_fileobj,
                                                         self.ListDelims)
-            ## TODO:  rename ListMarkers -> ListDelims globally
         self.log.debug('-- end of response content --')
         # Strip off the root element
         return response_dict[response_dict.keys()[0]]

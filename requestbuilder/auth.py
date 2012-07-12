@@ -11,7 +11,7 @@ from .exceptions import AuthError
 ISO8601 = '%Y-%m-%dT%H:%M:%SZ'
 
 class QuerySignatureV2Auth(requests.auth.AuthBase):
-    def __init__(self, service, key_id, key, params_to_post=True):
+    def __init__(self, service, key_id, key, params_to_data=True):
         self.service = service
         if not key_id:
             raise AuthError('missing access key ID')
@@ -21,7 +21,7 @@ class QuerySignatureV2Auth(requests.auth.AuthBase):
         self.hmac   = hmac.new(key, digestmod=hashlib.sha256)
         self.log    = self.service.log.getChild(self.__class__.__name__)
         # Whether to convert params to data if POSTing with only the former
-        self.params_to_post = params_to_post
+        self.params_to_data = params_to_data
 
     def __call__(self, req):
         # We assume that req.params is a dict
@@ -47,12 +47,12 @@ class QuerySignatureV2Auth(requests.auth.AuthBase):
         self.log.debug('b64-encoded signature: %s', signature)
         req.params['Signature'] = signature
 
-        self.convert_params_to_post(req)
+        self.convert_params_to_data(req)
 
         return req
 
-    def convert_params_to_post(self, req):
-        if (self.params_to_post and req.method.upper() == 'POST' and
+    def convert_params_to_data(self, req):
+        if (self.params_to_data and req.method.upper() == 'POST' and
             isinstance(req.params, dict)):
             # POST with params -> use params as form data instead
             self.log.debug('converting params to POST data')
