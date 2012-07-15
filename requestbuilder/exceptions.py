@@ -12,6 +12,16 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
 # OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
+
+try:
+    from xml.etree import cElementTree as ElementTree
+except ImportError:
+    from xml.etree import ElementTree
+try:
+    import cStringIO as StringIO
+except ImportError:
+    import StringIO
+
 class ClientError(Exception):
     '''
     General client error (error accessing the server)
@@ -45,19 +55,24 @@ class ServerError(RuntimeError):
         self.status_code = status  # HTTP status code
         self.body        = body or ''
         self.code        = None    # API error code
-        self.reason      = None    # Error message
+        self.message     = None    # Error message
 
         if self.body:
-            ## TODO
-            #try:
-            #    h = handler.XmlHandler(self, self)
-            #    xml.sax.parseString(self.body, h)
-            #except (TypeError, xml.sax.SAXParseException) as exc:
-            #    # Dump the unparseable part of the message body so we don't
-            #    # end up with garbage.  Since Eucalyptus tends to do hand back
-            #    # un-parseable text quite frequently, store it just in case.
-                self.reason = self.body
-                self.body   = None
+            try:
+                xml_stream = StringIO.StringIO(self.body)
+                for event, elem in ElementTree.iterparse(xml_stream,
+                                                         events=('end',)):
+                    if elem.tag == 'Code':
+                        self.code = elem.text
+                    elif elem.tag == 'Message':
+                        self.message = elem.text
+            except ElementTree.ParseError as err:
+                # Dump the unparseable message body so we don't include
+                # unusable garbage in the exception.  Since Eucalyptus
+                # frequently returns plain text and/or broken XML, store it
+                # in case we need it later.
+                self.message = self.body
+                self.body    = None
 
     def __str__(self):
         return '{cls}: {status} {reason}'.format(self.__class__.__name__,

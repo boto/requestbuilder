@@ -244,7 +244,7 @@ class BaseRequest(BaseCommand):
                 self.log.debug('-- end of response content --')
                 self.log.debug('result: failure')
                 raise ServerError(self.http_response.status_code,
-                                  self.http_response.text)
+                                  self.http_response.content)
         finally:
             # Empty the socket buffer so it can be reused
             try:
@@ -284,8 +284,12 @@ class BaseRequest(BaseCommand):
 
     def _handle_cli_exception(self, err):
         if isinstance(err, ServerError):
-            print >> sys.stderr, 'error ({code}) {reason}'.format(
-                    code=err.code, reason=err.reason or '')
+            if err.code:
+                print >> sys.stderr, 'error ({code}) {msg}'.format(
+                        code=err.code, msg=err.message or '')
+            else:
+                print >> sys.stderr, 'error {msg}'.format(
+                        msg=err.message or '')
             if self.debug:
                 raise
             sys.exit(1)
