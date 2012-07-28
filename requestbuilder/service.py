@@ -65,8 +65,6 @@ class BaseService(object):
         if not self.endpoint:
             raise ServiceInitError('no endpoint to connect to was given')
 
-        ## TODO:  deal with AuthClass-setup-related exceptions
-        ## TODO:  retry on certain 5xx errors
         auth = self.AuthClass(self, **self._auth_args)
         self.session = requests.session(auth=auth, **self._session_args)
 
@@ -103,10 +101,14 @@ class BaseService(object):
         elif self.APIVersion:
             params['Version'] = self.APIVersion
 
+        ## TODO:  test url-encoding
         if path:
-            ## FIXME: this is going to break when path is /
-            ## TODO: test other cases
-            url = urlparse.urljoin(self.endpoint, path)
+            # We can't simply use urljoin because a path might start with '/'
+            # like it could for S3 keys that start with that character.
+            if self.endpoint.endswith('/'):
+                url = self.endpoint + path
+            else:
+                url = self.endpoint + '/' + path
         else:
             url = self.endpoint
 
