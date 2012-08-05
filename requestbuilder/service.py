@@ -45,6 +45,9 @@ class BaseService(object):
         self._auth_args    = auth_args    or {}
         self._session_args = session_args or {}
 
+        # SSL verification is opt-in
+        self._session_args.setdefault('verify', False)
+
         # Grab info from the command line or service-specific config
         self.find_credentials()
 
