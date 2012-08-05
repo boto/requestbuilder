@@ -34,7 +34,7 @@ class QuerySignatureV2Auth(requests.auth.AuthBase):
             del req.params['Signature']
         parsed = urlparse.urlparse(req.url)
         to_sign = '{method}\n{host}\n{path}\n'.format(method=req.method,
-                host=parsed.netloc.lower(), path=parsed.path)
+                host=parsed.netloc.lower(), path=(parsed.path or '/'))
         quoted_params = []
         for key in sorted(req.params):
             val = text_type(req.params[key])
