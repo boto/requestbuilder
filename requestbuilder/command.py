@@ -30,6 +30,7 @@ except ImportError:
     import pdb
 
 from . import __version__, Arg, MutuallyExclusiveArgList
+from .config import Config
 from .logging import configure_root_logger
 
 class InheritableCommandClass(type):
@@ -91,6 +92,7 @@ class BaseCommand(object):
                 help='enable interactive debugger on error')]
     Filters = []
     DefaultRoute = None
+    ConfigFiles = ['/etc/requestbuilder.ini']
 
     def __init__(self, **kwargs):
         # Arguments corresponding to those in self.Args.  This may be used in
@@ -104,10 +106,15 @@ class BaseCommand(object):
 
         self._configure_logging()
 
+        self.read_config()
+
     def _configure_logging(self):
         self.log = logging.getLogger(self.name)
         if self.debug:
             self.log.setLevel(logging.DEBUG)
+
+    def read_config(self):
+        self.config = Config(self.ConfigFiles, log=self.log)
 
     @property
     def name(self):
@@ -198,6 +205,8 @@ class BaseCommand(object):
 
     @property
     def debug(self):
+        if hasattr(self, 'config') and self.config.globals.get('debug', False):
+            return True
         if self.args.get('debug') or self.args.get('debugger'):
             return True
         if any(arg in sys.argv for arg in ('--debug', '-D', '--debugger')):

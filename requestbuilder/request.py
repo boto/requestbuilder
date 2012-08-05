@@ -123,7 +123,8 @@ class BaseRequest(BaseCommand):
                     service_args['auth_args'][key] = val
                 elif key in self._arg_routes.get(SESSION, []):
                     service_args['session_args'][key] = val
-            self._service = self.ServiceClass(self.log, **service_args)
+            self._service = self.ServiceClass(self.config, self.log,
+                                              **service_args)
         return self._service
 
     @property

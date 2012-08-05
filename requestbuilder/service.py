@@ -23,7 +23,7 @@ from .auth import QuerySignatureV2Auth
 from .exceptions import ClientError, ServiceInitError
 
 class BaseService(object):
-    Name        = 'base'
+    Name        = ''
     Description = ''
     APIVersion  = ''
     MaxRetries  = 4
@@ -31,48 +31,78 @@ class BaseService(object):
     AuthClass = QuerySignatureV2Auth
     EnvURL    = 'AWS_URL'  # endpoint URL
 
-    # Region names (i.e. 'us-east-1') and their endpoints for this service
-    ## TODO:  replace this with a config-based system
-    Regions = {}
-
-    def __init__(self, log, endpoint=None, region_name=None, auth_args=None,
+    def __init__(self, config, log, url=None, regionspec=None, auth_args=None,
                  session_args=None):
         self.log = log
         # The region name currently only matters for sigv4.
         ## FIXME:  It also won't work with every config source yet.
-        self.endpoint      = endpoint
-        self.region_name   = region_name
+        ## TODO:  DOCUMENT:  if url contains :: it will be split into
+        ##                   regionspec::endpoint
+        ## FIXME:  Is the above info true any more?
+        self.config        = config
+        self.endpoint_url  = None
+        self.regionspec    = regionspec  ## TODO:  rename this
         self._auth_args    = auth_args    or {}
         self._session_args = session_args or {}
 
         # SSL verification is opt-in
         self._session_args.setdefault('verify', False)
 
+        # Set self.endpoint_url and self.regionspec from __init__ args
+        self._set_url_vars(url)
+
         # Grab info from the command line or service-specific config
-        self.find_credentials()
+        self.read_config()
 
-        # Try the environment next
-        if self.EnvURL in os.environ:
-            self.__set_missing(os.getenv(self.EnvURL, '__env__'))
-
-        ## TODO:  switch to a config-based system for obtaining region info
-        if region_name:
-            if region_name in self.Regions:
-                self.__set_missing(self.Regions[region_name], region_name)
-            else:
-                raise ServiceInitError('no such region: ' + region_name)
-        elif self.Regions:
-            ## TODO:  have a way of choosing a default region
-            self.__set_missing(self.Regions[self.region],
-                               self.Regions.keys()[0])
-        if not self.endpoint:
-            raise ServiceInitError('no endpoint to connect to was given')
+        if not self.endpoint_url:
+            regions = ', '.join(sorted(self.config.regions.keys()))
+            errmsg = 'no endpoint to connect to was given'
+            if regions:
+                errmsg += '.  Known regions are '
+                errmsg += ', '.join(sorted(self.config.regions.keys()))
+            raise ServiceInitError(errmsg)
 
         auth = self.AuthClass(self, **self._auth_args)
         self.session = requests.session(auth=auth, **self._session_args)
 
-    ## TODO:  rename this function
-    def find_credentials(self):
+    def read_config(self):
+        '''
+        Read configuration from the environment, files, and so on and use them
+        to populate self.endpoint_url, self.regionspec, and self._auth_args.
+
+        This method's configuration sources are, in order:
+          - An environment variable with the same name as self.EnvURL
+          - An AWS credential file, from the path given in the
+            AWS_CREDENTIAL_FILE environment variable
+          - Requestbuilder configuration files, from paths given in
+            self.ConfigFiles
+
+        Of these, earlier sources take precedence over later sources.
+
+        Subclasses may override this method to add or rearrange configuration
+        sources.
+        '''
+        # Try the environment first
+        if self.EnvURL in os.environ:
+            self._set_url_vars(os.getenv(self.EnvURL, None))
+        # Read config files from their default locations
+        self.read_aws_credential_file()
+        self.read_requestbuilder_config()
+
+    def read_requestbuilder_config(self):
+        self._set_url_vars(self.config.get_region_option(self.regionspec,
+                                                         self.Name + '-url'))
+        key = self.config.get_user_option(self.regionspec, 'key')
+        if key and not self._auth_args.get('key'):
+            self._auth_args['key'] = key
+        key_id = self.config.get_user_option(self.regionspec, 'key-id')
+        if key_id and not self._auth_args.get('key_id'):
+            self._auth_args['key_id'] = key_id
+
+        if self.config.get_region_option_bool(self.regionspec, 'verify-ssl'):
+            self._session_args['verify'] = True
+
+    def read_aws_credential_file(self):
         '''
         If the 'AWS_CREDENTIAL_FILE' environment variable exists, parse that
         file for access keys and use them if keys were not already supplied to
@@ -108,12 +138,12 @@ class BaseService(object):
         if path:
             # We can't simply use urljoin because a path might start with '/'
             # like it could for S3 keys that start with that character.
-            if self.endpoint.endswith('/'):
-                url = self.endpoint + path
+            if self.endpoint_url.endswith('/'):
+                url = self.endpoint_url + path
             else:
-                url = self.endpoint + '/' + path
+                url = self.endpoint_url + '/' + path
         else:
-            url = self.endpoint
+            url = self.endpoint_url
 
         hooks = {'pre_send':     _log_request_data(self.log),
                  'response':     _log_response_data(self.log),
@@ -129,9 +159,15 @@ class BaseService(object):
         except requests.exceptions.RequestException as exc:
             raise ClientError(exc)
 
-    def __set_missing(self, endpoint=None, region_name=None):
-        self.endpoint    = self.endpoint    or endpoint
-        self.region_name = self.region_name or region_name
+    def _set_url_vars(self, url):
+        if url:
+            if '::' in url:
+                regionspec, endpoint_url = url.split('::', 1)
+            else:
+                regionspec   = None
+                endpoint_url = url
+            self.regionspec   = regionspec   or self.regionspec
+            self.endpoint_url = endpoint_url or self.endpoint_url
 
 class RetryOnStatuses(object):
     def __init__(self, statuses, max_retries, logger=None):
