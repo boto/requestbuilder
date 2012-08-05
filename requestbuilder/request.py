@@ -85,7 +85,7 @@ class BaseRequest(BaseCommand):
         self.method    = 'GET'
 
         # HTTP response obtained from the server
-        self.http_response = None
+        self.response    = None
 
         self._service    = None
         self._user_agent = None
@@ -128,8 +128,8 @@ class BaseRequest(BaseCommand):
 
     @property
     def status(self):
-        if self.http_response is not None:
-            return self.http_response.status
+        if self.response is not None:
+            return self.response.status
         else:
             return None
 
@@ -230,25 +230,25 @@ class BaseRequest(BaseCommand):
         headers = dict(self.headers or {})
         headers.setdefault('User-Agent', self.user_agent)
         self.log.debug('serialized params: %s', params)
-        self.http_response = self.service.make_request(self.name,
+        self.response = self.service.make_request(self.name,
                 method=self.method, headers=headers, params=params,
                 data=self.post_data, api_version=self.APIVersion)
         try:
-            if 200 <= self.http_response.status_code < 300:
-                parsed = self.parse_response(self.http_response)
+            if 200 <= self.response.status_code < 300:
+                parsed = self.parse_response(self.response)
                 self.log.debug('result: success')
                 return parsed
             else:
                 self.log.debug('-- response content --\n%s',
-                               self.http_response.text)
+                               self.response.text)
                 self.log.debug('-- end of response content --')
                 self.log.debug('result: failure')
-                raise ServerError(self.http_response.status_code,
-                                  self.http_response.content)
+                raise ServerError(self.response.status_code,
+                                  self.response.content)
         finally:
             # Empty the socket buffer so it can be reused
             try:
-                self.http_response.content
+                self.response.content
             except RuntimeError:
                 # The content was already consumed
                 pass
@@ -261,7 +261,7 @@ class BaseRequest(BaseCommand):
         self.log.debug('-- response content --\n', extra={'append': True})
         # Using Response.iter_content gives us automatic decoding, but we then
         # have to make the generator look like a file so etree can use it.
-        with _IteratorFileObjAdapter(self.http_response.iter_content(16384)) \
+        with _IteratorFileObjAdapter(self.response.iter_content(16384)) \
                 as content_fileobj:
             logged_fileobj = _ReadLoggingFileWrapper(content_fileobj, self.log,
                                                      logging.DEBUG)
