@@ -307,18 +307,18 @@ def _requestbuilder_except_hook(debugger_enabled, debug_enabled):
     '''
     Wrapper for the debugger-launching except hook
     '''
-    def excepthook(typ, value, tracebk):
+    def excepthook(type_, value, tracebk):
         '''
         If the debugger option is enabled, launch epdb (or pdb if epdb is
         unavailable) when an uncaught exception occurs.
         '''
-        if typ is bdb.BdbQuit:
+        if type_ is bdb.BdbQuit:
             sys.exit(1)
         sys.excepthook = sys.__excepthook__
 
         if debugger_enabled and sys.stdout.isatty() and sys.stdin.isatty():
             if 'epdb' in sys.modules:
-                epdb.post_mortem(tracebk, typ, value)
+                epdb.post_mortem(tracebk, type_, value)
             else:
                 pdb.post_mortem(tracebk)
         elif debug_enabled:

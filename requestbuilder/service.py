@@ -122,9 +122,10 @@ class BaseService(object):
 
         try:
             return self.session.request(method=method, url=url, params=params,
-                                        data=data, headers=headers, hooks=hooks)
+                                        data=data, headers=headers,
+                                        hooks=hooks)
         except requests.exceptions.RequestException as exc:
-            raise ClientError(exc.message, exc)
+            raise ClientError(exc)
 
     def __set_missing(self, endpoint=None, region_name=None):
         self.endpoint    = self.endpoint    or endpoint

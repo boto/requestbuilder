@@ -24,7 +24,7 @@ except ImportError:
 
 class ClientError(Exception):
     '''
-    General client error (error accessing the server)
+    General client error (e.g. error accessing the server)
     '''
     pass
 
@@ -75,5 +75,9 @@ class ServerError(RuntimeError):
                 self.body    = None
 
     def __str__(self):
-        return '{cls}: {status} {reason}'.format(self.__class__.__name__,
-                                                 self.status, self.reason)
+        s_bits = [self.__class__.__name__ + ':', self.status_code]
+        if self.code:
+            s_bits.append(self.code)
+        if self.message:
+            s_bits.append(self.message)
+        return ' '.join(s_bits)

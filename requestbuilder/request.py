@@ -88,7 +88,7 @@ class BaseRequest(BaseCommand):
         self.response    = None
 
         self._service    = None
-        self._user_agent = None
+        self.__user_agent = None
 
     @property
     def name(self):
@@ -103,13 +103,13 @@ class BaseRequest(BaseCommand):
         '''
         Return a user-agent string for this program.
         '''
-        if not self._user_agent:
+        if not self.__user_agent:
             template = 'requestbuilder/{ver} ({os} {osver}; {python} {pyver})'
-            self._user_agent = template.format(ver=__version__,
+            self.__user_agent = template.format(ver=__version__,
                     os=platform.uname()[0], osver=platform.uname()[2],
                     python=platform.python_implementation(),
                     pyver=platform.python_version())
-        return self._user_agent
+        return self.__user_agent
 
     @property
     def service(self):
