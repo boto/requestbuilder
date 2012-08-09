@@ -124,6 +124,8 @@ class BaseService(object):
             return self.session.request(method=method, url=url, params=params,
                                         data=data, headers=headers,
                                         hooks=hooks)
+        except requests.exceptions.ConnectionError as exc:
+            raise ClientError('connection error')
         except requests.exceptions.RequestException as exc:
             raise ClientError(exc)
 
