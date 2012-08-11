@@ -170,7 +170,7 @@ class BaseCommand(object):
                     self.args.get('debug', False))
 
         if '_filters' in self.args:
-            self.args['Filter'] = _process_filters(cli_args.pop('_filters'))
+            self.args['Filter'] = _process_filters(self.args.pop('_filters'))
             self._arg_routes.setdefault(self.DefaultRoute, [])
             self._arg_routes[self.DefaultRoute].append('Filter')
 
