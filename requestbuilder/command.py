@@ -165,7 +165,7 @@ class BaseCommand(object):
             self.args.setdefault(key, val)
 
         if self.args.get('debugger'):
-            sys.excepthook = _requestbuilder_except_hook(
+            sys.excepthook = _debugger_except_hook(
                     self.args.get('debugger', False),
                     self.args.get('debug', False))
 
@@ -297,7 +297,7 @@ def _process_filters(cli_filters):
                in filter_args.iteritems()]
     return filters
 
-def _requestbuilder_except_hook(debugger_enabled, debug_enabled):
+def _debugger_except_hook(debugger_enabled, debug_enabled):
     '''
     Wrapper for the debugger-launching except hook
     '''
