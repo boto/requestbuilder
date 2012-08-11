@@ -45,11 +45,27 @@ class ProgressiveStreamHandler(logging.StreamHandler):
         except Exception:
             self.handleError(record)
 
-def configure_root_logger():
+class ColoringFormatter(logging.Formatter):
+    LOG_COLORS = [(logging.ERROR, '\033[91m'),
+                  (logging.WARN,  '\033[93m'),
+                  (logging.INFO,  '\033[92m'),
+                  (logging.DEBUG, '\033[94m')]
+
+    def format(self, record):
+        msg = logging.Formatter.format(self, record)
+        for level, colorcode in sorted(self.LOG_COLORS, reverse=True):
+            if record.levelno >= level:
+                return colorcode + msg + '\033[0m'
+        return msg
+
+def configure_root_logger(use_color=False):
     logfmt = '%(asctime)s %(levelname)-7s %(name)s %(message)s'
     rootlogger = logging.getLogger('')
     handler    = ProgressiveStreamHandler()
-    formatter  = logging.Formatter(logfmt)
+    if use_color:
+        formatter = ColoringFormatter(logfmt)
+    else:
+        formatter = logging.Formatter(logfmt)
     handler.setFormatter(formatter)
     rootlogger.addHandler(handler)
     rootlogger.setLevel(100)

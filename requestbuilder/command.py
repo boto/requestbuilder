@@ -202,7 +202,9 @@ class BaseCommand(object):
         result to print_result.
         '''
         try:
-            configure_root_logger()
+            use_color = self.config.globals.get('color-logs', 'false')
+            use_color = use_color.lower() in ('true', '1', 'yes', 'on')
+            configure_root_logger(use_color=use_color)
             self.process_cli_args()  # self.args is populated
             response = self.main()
             self.print_result(response)
