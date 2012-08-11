@@ -101,20 +101,22 @@ class BaseCommand(object):
 
         self._arg_routes = {}
         self._cli_parser = None
+        self._config     = None
 
         self._parse_arg_lists()
 
         self._configure_logging()
-
-        self.read_config()
 
     def _configure_logging(self):
         self.log = logging.getLogger(self.name)
         if self.debug:
             self.log.setLevel(logging.DEBUG)
 
-    def read_config(self):
-        self.config = Config(self.ConfigFiles, log=self.log)
+    @property
+    def config(self):
+        if not self._config:
+            self._config = Config(self.ConfigFiles, log=self.log)
+        return self._config
 
     @property
     def name(self):
@@ -205,7 +207,7 @@ class BaseCommand(object):
 
     @property
     def debug(self):
-        if hasattr(self, 'config') and self.config.globals.get('debug', False):
+        if self._config and self.config.globals.get('debug', False):
             return True
         if self.args.get('debug') or self.args.get('debugger'):
             return True
