@@ -53,3 +53,9 @@ def configure_root_logger():
     handler.setFormatter(formatter)
     rootlogger.addHandler(handler)
     rootlogger.setLevel(100)
+
+    # Attempt to have logging capture warnings as well (requires 2.7)
+    try:
+        logging.captureWarnings(True)
+    except AttributeError:
+        pass

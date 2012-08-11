@@ -109,12 +109,6 @@ class BaseCommand(object):
         if self.debug:
             self.log.setLevel(logging.DEBUG)
 
-            # Attempt to have logging capture warnings as well (requires 2.7)
-            try:
-                logging.captureWarnings(True)
-            except AttributeError:
-                pass
-
     @property
     def name(self):
         return self.__class__.__name__
