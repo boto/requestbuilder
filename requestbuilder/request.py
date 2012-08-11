@@ -230,20 +230,20 @@ class BaseRequest(BaseCommand):
         params.update(self.serialize_params(self.params, _ALWAYS))
         headers = dict(self.headers or {})
         headers.setdefault('User-Agent', self.user_agent)
-        self.log.debug('serialized params: %s', params)
+        self.log.info('parameters: %s', params)
         self.response = self.service.make_request(self.name,
                 method=self.method, headers=headers, params=params,
                 data=self.post_data, api_version=self.APIVersion)
         try:
             if 200 <= self.response.status_code < 300:
                 parsed = self.parse_response(self.response)
-                self.log.debug('result: success')
+                self.log.info('result: success')
                 return parsed
             else:
                 self.log.debug('-- response content --\n%s',
                                self.response.text)
                 self.log.debug('-- end of response content --')
-                self.log.debug('result: failure')
+                self.log.info('result: failure')
                 raise ServerError(self.response.status_code,
                                   self.response.content)
         finally:

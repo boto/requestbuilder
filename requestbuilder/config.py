@@ -24,6 +24,7 @@ class Config(object):
         self.regions = {}
         self.users   = {}
         self.globals = {}
+        self._memo   = {}
         self._parse_config(filenames)
 
     def _parse_config(self, filenames):
@@ -111,29 +112,43 @@ class Config(object):
         else:
             raise ValueError('value {0} is not boolean'.format(repr(value)))
 
-    def _lookup_recursively(self, confdict, section, option, redact=None):
+    def _lookup_recursively(self, confdict, section, option, redact=None,
+                            cont_reason=None):
         ## TODO:  detect loops
+        self._memo.setdefault(id(confdict), {})
+        if (section, option) in self._memo[id(confdict)]:
+            return self._memo[id(confdict)][(section, option)]
+        def memoize(value):
+            self._memo[id(confdict)][(section, option)] = value
+            return value
+
         section_bits = section.split(':')
+        if not cont_reason:
+            self.log.debug('searching for option %s', repr(option))
         for prd in itertools.product((True, False), repeat=len(section_bits)):
             prd_section = ':'.join(section_bits[i] if prd[i] else '*'
                                    for i in range(len(section_bits)))
-            self.log.debug('searching for section %s', prd_section)
+            if cont_reason:
+                self.log.debug('  section %s (%s)', repr(prd_section),
+                               cont_reason)
+                cont_reason = None
+            else:
+                self.log.debug('  section %s', repr(prd_section))
             if prd_section in confdict:
-                self.log.debug('searching for option  %s::%s', prd_section,
-                               option)
                 if option in confdict[prd_section]:
                     value = confdict[prd_section][option]
                     if redact and option in redact:
                         print_value = '<redacted>'
                     else:
-                        print_value = value
-                    self.log.debug('found option value    %s::%s == %s',
-                                   prd_section, option, print_value)
-                    return value
+                        print_value = repr(value)
+                    self.log.info('option value %s = %s', repr(option),
+                                  print_value)
+                    return memoize(value)
                 elif confdict[prd_section].get('defer-to') in confdict:
                     deferral = confdict[prd_section]['defer-to']
-                    self.log.debug('deferring to  section %s', deferral)
-                    return self._lookup_recursively(confdict, deferral, option)
+                    return memoize(self._lookup_recursively(
+                            confdict, deferral, option,
+                            cont_reason='deferred'))
         # That didn't work; try matching something higher in the hierarchy.
         # Example:  'us-east-1' -> 'aws:us-east-1'
         c_counts = {}
@@ -146,15 +161,16 @@ class Config(object):
             if count > len(section_bits):
                 matches = c_counts[count]
                 if len(matches) == 1:
-                    self.log.debug('promoting to  section %s', matches[0])
-                    return self._lookup_recursively(confdict, matches[0],
-                                                    option)
+                    return memoize(self._lookup_recursively(
+                            confdict, matches[0], option,
+                            cont_reason=('from ' + repr(section))))
                 elif len(matches) > 1:
                     raise ValueError(
                             '{0} is ambiguous; closest matches are {1}'.format(
                             repr(section), ', '.join(map(repr, matches))))
-        self.log.debug('no such option: %s', option)
-        return None
+        self.log.info('option value %s not found', repr(option))
+        return memoize(None)
+
 
 class _FakeLogger(object):
     def fake_method(self, *args, **kwargs):

@@ -207,7 +207,12 @@ def _log_request_data(logger):
 
 def _log_response_data(logger):
     def __log_response_data(response):
-        logger.debug('response status: %i', response.status_code)
+        if response.status_code >= 400:
+            logger.error('response status: %i', response.status_code)
+        elif response.status_code >= 300:
+            logger.info('response status: %i', response.status_code)
+        else:
+            logger.debug('response status: %i', response.status_code)
         if isinstance(response.headers, dict):
             for key, val in sorted(response.headers.items()):
                 logger.debug('response header: %s: %s', key, val)
