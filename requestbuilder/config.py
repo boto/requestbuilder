@@ -137,6 +137,21 @@ class Config(object):
             if prd_section in confdict:
                 if option in confdict[prd_section]:
                     value = confdict[prd_section][option]
+                    # Check if we're supposed to pull from another section
+                    if value.startswith('use '):
+                        value_chunks = value.split()
+                        if len(value_chunks) == 1:
+                            raise ValueError("something must follow 'use' in "
+                                             "{0}".format(repr(value)))
+                        new_section = value_chunks[1]
+                        if len(value_chunks) > 2:
+                            new_option = value_chunks[2]
+                        else:
+                            new_option = option
+                        return memoize(self._lookup_recursively(
+                                confdict, new_section, new_option,
+                                cont_reason='deferred'))
+                    # We're done!
                     if redact and option in redact:
                         print_value = '<redacted>'
                     else:
@@ -144,11 +159,6 @@ class Config(object):
                     self.log.info('option value %s = %s', repr(option),
                                   print_value)
                     return memoize(value)
-                elif confdict[prd_section].get('defer-to') in confdict:
-                    deferral = confdict[prd_section]['defer-to']
-                    return memoize(self._lookup_recursively(
-                            confdict, deferral, option,
-                            cont_reason='deferred'))
         # That didn't work; try matching something higher in the hierarchy.
         # Example:  'us-east-1' -> 'aws:us-east-1'
         c_counts = {}
