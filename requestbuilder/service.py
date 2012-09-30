@@ -92,9 +92,9 @@ class BaseService(object):
     def read_requestbuilder_config(self):
         self._set_url_vars(self.config.get_region_option(self.regionspec,
                                                          self.Name + '-url'))
-        key = self.config.get_user_option(self.regionspec, 'key')
-        if key and not self._auth_args.get('key'):
-            self._auth_args['key'] = key
+        secret_key = self.config.get_user_option(self.regionspec, 'secret-key')
+        if secret_key and not self._auth_args.get('secret_key'):
+            self._auth_args['secret_key'] = secret_key
         key_id = self.config.get_user_option(self.regionspec, 'key-id')
         if key_id and not self._auth_args.get('key_id'):
             self._auth_args['key_id'] = key_id
@@ -121,8 +121,8 @@ class BaseService(object):
                             not self._auth_args.get('key_id')):
                             self._auth_args['key_id'] = val.strip()
                         elif (key.strip() == 'AWSSecretKey' and
-                              not self._auth_args.get('key')):
-                            self._auth_args['key'] = val.strip()
+                              not self._auth_args.get('secret_key')):
+                            self._auth_args['secret_key'] = val.strip()
 
     def make_request(self, action, method='GET', path=None, params=None,
                      headers=None, data=None, api_version=None):

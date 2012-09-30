@@ -125,4 +125,5 @@ SESSION = type('SESSION', (), {'__repr__': lambda self: 'SESSION'})()
 STD_AUTH_ARGS = [
         Arg('-I', '--access-key-id', dest='key_id', metavar='KEY_ID',
             route_to=AUTH),
-        Arg('-S', '--secret-key', dest='key', metavar='KEY', route_to=AUTH)]
+        Arg('-S', '--secret-key', dest='secret_key', metavar='KEY',
+            route_to=AUTH)]

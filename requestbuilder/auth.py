@@ -11,14 +11,14 @@ from .exceptions import AuthError
 ISO8601 = '%Y-%m-%dT%H:%M:%SZ'
 
 class QuerySignatureV2Auth(requests.auth.AuthBase):
-    def __init__(self, service, key_id, key, params_to_data=True):
+    def __init__(self, service, key_id, secret_key, params_to_data=True):
         self.service = service
         if not key_id:
             raise AuthError('missing access key ID')
-        if not key:
+        if not secret_key:
             raise AuthError('missing secret key')
         self.key_id = key_id
-        self.hmac   = hmac.new(key, digestmod=hashlib.sha256)
+        self.hmac   = hmac.new(secret_key, digestmod=hashlib.sha256)
         self.log    = self.service.log.getChild(self.__class__.__name__)
         # Whether to convert params to data if POSTing with only the former
         self.params_to_data = params_to_data
