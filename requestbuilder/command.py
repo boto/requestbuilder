@@ -116,6 +116,10 @@ class BaseCommand(object):
     def config(self):
         if not self._config:
             self._config = Config(self.ConfigFiles, log=self.log)
+            # Now that we have a config file we should check to see if it wants
+            # us to turn on debugging
+            if self._config.get_global_option_bool('debug'):
+                self.log.setLevel(logging.DEBUG)
         return self._config
 
     @property
