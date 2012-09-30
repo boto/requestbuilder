@@ -73,6 +73,8 @@ class Config(object):
                 user, region = regionspec.split('@', 1)
             else:
                 region = regionspec
+        if not region:
+            region = self.globals.get('default-region')
         if not user and region:
             user = self._lookup_recursively(self.regions, region,
                                             'default-user')
