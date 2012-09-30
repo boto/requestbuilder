@@ -58,6 +58,13 @@ class Config(object):
                 self.users[user] = dict(parser.items(section))
             # Ignore unrecognized sections for forward compatibility
 
+    def get_global_option(self, option):
+        return self.globals.get(option)
+
+    def get_global_option_bool(self, option, default=None):
+        value = self.get_global_option(option)
+        return convert_to_bool(value, default=default)
+
     def get_user_option(self, regionspec, option):
         user   = None
         region = None
@@ -79,14 +86,7 @@ class Config(object):
 
     def get_user_option_bool(self, regionspec, option, default=None):
         value = self.get_user_option(regionspec, option)
-        if value is None:
-            return default
-        elif value.lower() in ('true', '1', 'yes', 'on'):
-            return True
-        elif value.lower() in ('false', '0', 'no', 'off'):
-            return False
-        else:
-            raise ValueError('value {0} is not boolean'.format(repr(value)))
+        return convert_to_bool(value, default=default)
 
     def get_region_option(self, regionspec, option):
         if regionspec:
@@ -103,14 +103,7 @@ class Config(object):
 
     def get_region_option_bool(self, regionspec, option, default=None):
         value = self.get_region_option(regionspec, option)
-        if value is None:
-            return default
-        elif value.lower() in ('true', '1', 'yes', 'on'):
-            return True
-        elif value.lower() in ('false', '0', 'no', 'off'):
-            return False
-        else:
-            raise ValueError('value {0} is not boolean'.format(repr(value)))
+        return convert_to_bool(value, default=default)
 
     def _lookup_recursively(self, confdict, section, option, redact=None,
                             cont_reason=None):
@@ -188,3 +181,14 @@ class _FakeLogger(object):
 
     def __getattribute__(self, name):
         return object.__getattribute__(self, 'fake_method')
+
+
+def convert_to_bool(value, default=None):
+    if value is None:
+        return default
+    elif value.lower() in ('true', '1', 'yes', 'on'):
+        return True
+    elif value.lower() in ('false', '0', 'no', 'off'):
+        return False
+    else:
+        raise ValueError('value {0} is not boolean'.format(repr(value)))

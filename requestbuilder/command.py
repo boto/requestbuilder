@@ -202,8 +202,8 @@ class BaseCommand(object):
         result to print_result.
         '''
         try:
-            use_color = self.config.globals.get('color-logs', 'false')
-            use_color = use_color.lower() in ('true', '1', 'yes', 'on')
+            use_color = self.config.get_global_option_bool('color-logs',
+                                                           default=False)
             configure_root_logger(use_color=use_color)
             self.process_cli_args()  # self.args is populated
             response = self.main()
@@ -213,7 +213,7 @@ class BaseCommand(object):
 
     @property
     def debug(self):
-        if self._config and self.config.globals.get('debug', False):
+        if self._config and self.config.get_global_option_bool('debug'):
             return True
         if self.args.get('debug') or self.args.get('debugger'):
             return True
