@@ -118,7 +118,7 @@ class BaseCommand(object):
             self._config = Config(self.ConfigFiles, log=self.log)
             # Now that we have a config file we should check to see if it wants
             # us to turn on debugging
-            if self._config.get_global_option_bool('debug'):
+            if self.__config_enables_debugging():
                 self.log.setLevel(logging.DEBUG)
         return self._config
 
@@ -202,9 +202,10 @@ class BaseCommand(object):
         result to print_result.
         '''
         try:
-            use_color = self.config.get_global_option_bool('color-logs',
-                                                           default=False)
-            configure_root_logger(use_color=use_color)
+            if self.config.get_global_option('debug') in ('color', 'colour'):
+                configure_root_logger(use_color=True)
+            else:
+                configure_root_logger()
             self.process_cli_args()  # self.args is populated
             response = self.main()
             self.print_result(response)
@@ -213,7 +214,7 @@ class BaseCommand(object):
 
     @property
     def debug(self):
-        if self._config and self.config.get_global_option_bool('debug'):
+        if self._config and self.__config_enables_debugging():
             return True
         if self.args.get('debug') or self.args.get('debugger'):
             return True
@@ -282,6 +283,13 @@ class BaseCommand(object):
             else:
                 helplines.append('  ' + filter_obj.name)
         return '\n'.join(helplines)
+
+    def __config_enables_debugging(self):
+        if self._config.get_global_option('debug') in ('color', 'colour'):
+            # It isn't boolean, but still counts as true.
+            return True
+        return self._config.get_global_option_bool('debug', False)
+
 
 def _parse_filter(filter_str, filter_objs=None):
     '''
