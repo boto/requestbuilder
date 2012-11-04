@@ -2,7 +2,6 @@ import base64
 import hashlib
 import hmac
 import requests.auth
-from six import text_type
 import time
 import urllib
 import urlparse
@@ -11,6 +10,10 @@ from .exceptions import AuthError
 ISO8601 = '%Y-%m-%dT%H:%M:%SZ'
 
 class QuerySignatureV2Auth(requests.auth.AuthBase):
+    '''
+    AWS signature version 2
+    http://docs.amazonwebservices.com/general/latest/gr/signature-version-2.html
+    '''
     def __init__(self, service, key_id, secret_key, params_to_data=True):
         self.service = service
         if not key_id:

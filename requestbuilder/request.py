@@ -85,9 +85,9 @@ class BaseRequest(BaseCommand):
         self.method    = 'GET'
 
         # HTTP response obtained from the server
-        self.response    = None
+        self.response = None
 
-        self._service    = None
+        self._service     = None
         self.__user_agent = None
 
     @property
