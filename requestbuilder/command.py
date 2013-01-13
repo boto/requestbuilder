@@ -16,7 +16,6 @@ from __future__ import absolute_import
 
 import argparse
 import bdb
-from functools import partial
 import json
 import logging
 import pprint
@@ -48,7 +47,9 @@ class InheritableCommandClass(type):
                             attrs[attrname].append(attr)
         return type.__new__(mcs, name, bases, attrs)
 
+
 class BaseCommand(object):
+    ## TODO:  Fix this docstring
     '''
     The basis for a command line tool.  To invoke this as a command line tool,
     call the do_cli() method on an instance of the class; arguments will be
@@ -75,10 +76,6 @@ class BaseCommand(object):
                      classes needing to add command line arguments should
                      contain their own Args lists, which are *prepended* to
                      those of their parent classes.
-     - Filters:      a list of Filter objects that are used to generate filter
-                     options at the command line.  Inheriting classes needing
-                     to add filters should contain their own Filters lists,
-                     which are *prepended* to those of their parent classes.
     '''
 
     __metaclass__ = InheritableCommandClass
@@ -90,31 +87,139 @@ class BaseCommand(object):
                 help='show debugging output'),
             Arg('--debugger', action='store_true', route_to=None,
                 help='enable interactive debugger on error')]
-    Filters = []
     DefaultRoute = None
     ConfigFiles = ['/etc/requestbuilder.ini']
 
-    def __init__(self, **kwargs):
-        # Arguments corresponding to those in self.Args.  This may be used in
-        # lieu of (and will take priority over) arguments given at the CLI.
-        self.args = kwargs
-
-        self._arg_routes = {}
-        self._cli_parser = None
-        self._config     = None
-
-        self._parse_arg_lists()
+    def __init__(self, _do_cli=False, **kwargs):
+        # Note to programmer:  when run() is initializing the first object it
+        # can't catch exceptions that may result from accesses to self.config.
+        # To deal with this, run() disables config file parsing during this
+        # process to expose premature access to self.config during testing.
+        self.args          = {}    # populated later
+        self.log           = None  # created by _configure_logging
+        self._allowed_args = None  # created by _build_parser
+        self._arg_routes   = {}
+        self._cli_parser   = None  # created by _build_parser
+        self._config       = None
 
         self._configure_logging()
 
+        # We need to enforce arg constraints in one location to make this
+        # framework equally useful for chained commands and those driven
+        # directly from the command line.  Thus, we do most of the parsing/
+        # validation work in __init__ as opposed to putting it off until
+        # we hit CLI-specific code.
+        self._build_parser()
+
+        # Come up with a list of args that the arg parser will allow
+        for key, val in kwargs.iteritems():
+            if key in self._allowed_args:
+                self.args[key] = val
+            else:
+                raise TypeError('__init__() got an unexpected keyword '
+                                'argument \'{0}\'; allowed arguments are {1}'
+                                .format(key, ', '.join(self._allowed_args)))
+
+        ## TODO:  AUTH PARAM PASSING (probably involves the service class)
+        if _do_cli:
+            self._process_cli_args()
+        else:
+            # TODO:  enforce arg constraints when not pulling from the CLI
+            pass
+
     def _configure_logging(self):
+        # Does not have access to self.config
         self.log = logging.getLogger(self.name)
         if self.debug:
             self.log.setLevel(logging.DEBUG)
 
+    def _build_parser(self):
+        # Does not have access to self.config
+        description = '\n\n'.join([textwrap.fill(textwrap.dedent(para))
+                                   for para in self.Description.split('\n\n')])
+        parser = argparse.ArgumentParser(description=description,
+                formatter_class=argparse.RawDescriptionHelpFormatter)
+        self._allowed_args = self._populate_parser(parser)
+        parser.add_argument('--version', action='version',
+                            version=self.Version)  # doesn't need routing
+        self._cli_parser = parser
+
+    def _populate_parser(self, parser):
+        # Returns the args the parser was populated with  <-- FIXME (the docs)
+        # Does not have access to self.config
+        ## TODO:  rename Args -> ARGS
+        args = []
+        for arg_obj in self.Args:
+            args.extend(self.__add_arg_to_cli_parser(arg_obj, parser))
+        return args
+
+    def _process_cli_args(self):
+        '''
+        Process CLI args to fill in missing parts of self.args and enable
+        debugging if necessary.
+        '''
+        # Does not have access to self.config
+        cli_args = self._cli_parser.parse_args()
+        for (key, val) in vars(cli_args).iteritems():
+            self.args.setdefault(key, val)
+
+    def __add_arg_to_cli_parser(self, arglike_obj, parser):
+        # Returns the args the parser was populated with
+        # Does not have access to self.config
+        if isinstance(arglike_obj, Arg):
+            if arglike_obj.kwargs.get('dest') is argparse.SUPPRESS:
+                # Treat it like it doesn't exist at all
+                return []
+            else:
+                arg = parser.add_argument(*arglike_obj.pargs,
+                                          **arglike_obj.kwargs)
+                route = getattr(arglike_obj, 'route', self.DefaultRoute)
+                self._arg_routes.setdefault(route, [])
+                self._arg_routes[route].append(arg.dest)
+                return [arg]
+        elif isinstance(arglike_obj, MutuallyExclusiveArgList):
+            exgroup = parser.add_mutually_exclusive_group(
+                    required=arglike_obj.required)
+            args = []
+            for group_arg in arglike_obj:
+                args.extend(self.__add_arg_to_cli_parser(group_arg, exgroup))
+            return args
+        else:
+            raise TypeError('Unknown argument type ' +
+                            arglike_obj.__class__.__name__)
+
+    @classmethod
+    def run(cls):
+        BaseCommand.__INHIBIT_CONFIG_PARSING = True
+        ## TODO:  document:  command line entry point
+        cmd = cls(_do_cli=True)
+        BaseCommand.__INHIBIT_CONFIG_PARSING = False
+        try:
+            cmd.configure_global_logging()
+            result = cmd.main()
+            cmd.print_result(result)
+        except Exception as err:
+            cmd.handle_cli_exception(err)
+
+    ## TODO:  backward compat; remove this
+    do_cli = run
+
+    def configure_global_logging(self):
+        if self.config.get_global_option('debug') in ('color', 'colour'):
+            configure_root_logger(use_color=True)
+        else:
+            configure_root_logger()
+        if self.args.get('debugger'):
+            sys.excepthook = _debugger_except_hook(
+                    self.args.get('debugger', False),
+                    self.args.get('debug', False))
+
     @property
     def config(self):
         if not self._config:
+            if getattr(BaseCommand, '__INHIBIT_CONFIG_PARSING', False):
+                raise AssertionError(
+                        'config files may not be parsed during __init__')
             self._config = Config(self.ConfigFiles, log=self.log)
             # Now that we have a config file we should check to see if it wants
             # us to turn on debugging
@@ -132,6 +237,7 @@ class BaseCommand(object):
         out.  The default formatter attempts to print JSON or something else
         reasonable.  Override this method if you want specific formatting.
         '''
+        ## TODO:  make this a noop
         if data:
             if isinstance(data, dict):
                 for (key, val) in data.iteritems():
@@ -145,72 +251,12 @@ class BaseCommand(object):
             else:
                 pprint.pprint(data)
 
-    def _parse_arg_lists(self):
-        '''
-        Use self.Args and self.Filters to build a command line argument parser
-        that is stored to self._cli_parser and to populate the argument routing
-        table.
-        '''
-        description = '\n\n'.join([textwrap.fill(textwrap.dedent(para))
-                                   for para in self.Description.split('\n\n')])
-        self._cli_parser = argparse.ArgumentParser(description=description,
-                formatter_class=argparse.RawDescriptionHelpFormatter)
-        for arg_obj in self.Args:
-            self.__add_arg_to_cli_parser(arg_obj, self._cli_parser)
-        if self.Filters:
-            self._cli_parser.add_argument('--filter', metavar='NAME=VALUE',
-                    action='append', dest='_filters',
-                    help='restrict results to resources that meet criteria',
-                    type=partial(_parse_filter, filter_objs=self.Filters))
-            self._arg_routes.setdefault(None, [])
-            self._arg_routes[None].append('_filters')
-            self._cli_parser.epilog = self.__build_filter_help()
-        self._cli_parser.add_argument('--version', action='version',
-                                      version=self.Version)
-
-    def process_cli_args(self):
-        '''
-        Process CLI args to fill in missing parts of self.args and enable
-        debugging if necessary.
-        '''
-        cli_args = self._cli_parser.parse_args().__dict__
-        for (key, val) in cli_args.iteritems():
-            self.args.setdefault(key, val)
-
-        if self.args.get('debugger'):
-            sys.excepthook = _debugger_except_hook(
-                    self.args.get('debugger', False),
-                    self.args.get('debug', False))
-
-        if '_filters' in self.args:
-            self.args['Filter'] = _process_filters(self.args.pop('_filters'))
-            self._arg_routes.setdefault(self.DefaultRoute, [])
-            self._arg_routes[self.DefaultRoute].append('Filter')
-
     def main(self):
         '''
         The main processing method.  main() is expected to do something with
         self.args and return a result.
         '''
         pass
-
-    def do_cli(self):
-        '''
-        The entry point for the command line.  This method parses command line
-        arguments using the class's Args and Filters lists to populate
-        self.args, obtains a response from the main method, then passes the
-        result to print_result.
-        '''
-        try:
-            if self.config.get_global_option('debug') in ('color', 'colour'):
-                configure_root_logger(use_color=True)
-            else:
-                configure_root_logger()
-            self.process_cli_args()  # self.args is populated
-            response = self.main()
-            self.print_result(response)
-        except Exception as err:
-            self._handle_cli_exception(err)
 
     @property
     def debug(self):
@@ -223,66 +269,11 @@ class BaseCommand(object):
             return True
         return False
 
-    def _handle_cli_exception(self, err):
+    def handle_cli_exception(self, err):
         print >> sys.stderr, 'error: {0}'.format(err)
         if self.debug:
             raise
         sys.exit(1)
-
-    def __add_arg_to_cli_parser(self, arglike_obj, parser):
-        if isinstance(arglike_obj, Arg):
-            if arglike_obj.kwargs.get('dest') is not argparse.SUPPRESS:
-                arg = parser.add_argument(*arglike_obj.pargs,
-                                          **arglike_obj.kwargs)
-                route = getattr(arglike_obj, 'route', self.DefaultRoute)
-                self._arg_routes.setdefault(route, [])
-                self._arg_routes[route].append(arg.dest)
-        elif isinstance(arglike_obj, MutuallyExclusiveArgList):
-            exgroup = parser.add_mutually_exclusive_group(
-                    required=arglike_obj.required)
-            for group_arg in arglike_obj:
-                self.__add_arg_to_cli_parser(group_arg, exgroup)
-        else:
-            raise TypeError('Unknown argument type ' +
-                            arglike_obj.__class__.__name__)
-
-    def __build_filter_help(self):
-        '''
-        Return a pre-formatted help string for all of the filters defined in
-        self.Filters.  The result is meant to be used as command line help
-        output.
-        '''
-        if '-h' not in sys.argv and '--help' not in sys.argv:
-            # Performance optimization
-            return ''
-
-        ## FIXME:  This code has a bug with triple-quoted strings that contain
-        ##         embedded indentation.  textwrap.dedent doesn't seem to help.
-        ##         Reproducer: 'whether the   volume will be deleted'
-        max_len = 24
-        col_len = max([len(filter_obj.name) for filter_obj in self.Filters
-                       if len(filter_obj.name) < max_len]) - 1
-        helplines = ['available filter names:']
-        for filter_obj in self.Filters:
-            if filter_obj.help:
-                if len(filter_obj.name) <= col_len:
-                    # filter-name    Description of the filter that
-                    #                continues on the next line
-                    right_space = ' ' * (max_len - len(filter_obj.name) - 2)
-                    wrapper = textwrap.TextWrapper(fix_sentence_endings=True,
-                        initial_indent=('  ' + filter_obj.name + right_space),
-                        subsequent_indent=(' ' * max_len))
-                else:
-                    # really-long-filter-name
-                    #                Description that begins on the next line
-                    helplines.append('  ' + filter_obj.name)
-                    wrapper = textwrap.TextWrapper(fix_sentence_endings=True,
-                            initial_indent=(   ' ' * max_len),
-                            subsequent_indent=(' ' * max_len))
-                helplines.extend(wrapper.wrap(filter_obj.help))
-            else:
-                helplines.append('  ' + filter_obj.name)
-        return '\n'.join(helplines)
 
     def __config_enables_debugging(self):
         if self._config.get_global_option('debug') in ('color', 'colour'):
@@ -290,37 +281,6 @@ class BaseCommand(object):
             return True
         return self._config.get_global_option_bool('debug', False)
 
-
-def _parse_filter(filter_str, filter_objs=None):
-    '''
-    Given a "key=value" string given as a command line parameter, return a pair
-    with the matching filter's dest member and the given value after converting
-    it to the type expected by the filter.  If this is impossible, an
-    ArgumentTypeError will result instead.
-    '''
-    # Find the appropriate filter object
-    filter_objs = [obj for obj in (filter_objs or [])
-                   if obj.matches_argval(filter_str)]
-    if not filter_objs:
-        msg = '"{0}" matches no available filters'.format(filter_str)
-        raise argparse.ArgumentTypeError(msg)
-    return filter_objs[0].convert(filter_str)
-
-def _process_filters(cli_filters):
-    '''
-    Change filters from the [(key, value), ...] format given at the command
-    line to [{'Name': key, 'Value': [value, ...]}, ...] format, which
-    flattens to the form the server expects.
-    '''
-    filter_args = {}
-    # Compile [(key, value), ...] pairs into {key: [value, ...], ...}
-    for (key, val) in cli_filters or {}:
-        filter_args.setdefault(key, [])
-        filter_args[key].append(val)
-    # Build the flattenable [{'Name': key, 'Value': [value, ...]}, ...]
-    filters = [{'Name': name, 'Value': values} for (name, values)
-               in filter_args.iteritems()]
-    return filters
 
 def _debugger_except_hook(debugger_enabled, debug_enabled):
     '''

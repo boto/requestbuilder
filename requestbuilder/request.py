@@ -14,9 +14,11 @@
 
 from __future__ import absolute_import
 
+from functools import partial
 import logging
 import platform
 import sys
+import textwrap
 
 from . import __version__, EMPTY, AUTH, PARAMS, SERVICE, SESSION
 from .command import BaseCommand
@@ -69,9 +71,12 @@ class BaseRequest(BaseCommand):
     APIVersion   = None
     Action       = None
 
+    ## TODO:  rename Filters -> FILTERS
+    Filters = []
+    DefaultRoute = PARAMS
+
     ListDelims = []
 
-    DefaultRoute = PARAMS
 
     def __init__(self, **kwargs):
         BaseCommand.__init__(self, **kwargs)
@@ -89,6 +94,28 @@ class BaseRequest(BaseCommand):
 
         self._service     = None
         self.__user_agent = None
+
+    def _populate_parser(self, parser):
+        # Does not have access to self.config
+        args = BaseCommand._populate_parser(self, parser)
+        if self.Filters:
+            args.append(parser.add_argument('--filter', metavar='NAME=VALUE',
+                        action='append', dest='filters',
+                        help='restrict results to those that meet criteria',
+                        type=partial(_parse_filter, filter_objs=self.Filters)))
+            parser.epilog = self.__build_filter_help()
+            self._arg_routes.setdefault(None, [])
+            self._arg_routes[None].append('filters')
+        ## TODO:  service args
+        return args
+
+    def _process_cli_args(self):
+        # Does not have access to self.config
+        BaseCommand._process_cli_args(self)
+        if 'filters' in self.args:
+            self.args['Filter'] = _process_filters(self.args.pop('filters'))
+            self._arg_routes.setdefault(self.DefaultRoute, [])
+            self._arg_routes[self.DefaultRoute].append('Filter')
 
     @property
     def name(self):
@@ -283,7 +310,7 @@ class BaseRequest(BaseCommand):
         '''
         return self.send()
 
-    def _handle_cli_exception(self, err):
+    def handle_cli_exception(self, err):
         if isinstance(err, ServerError):
             if err.code:
                 print >> sys.stderr, 'error ({code}) {msg}'.format(
@@ -295,7 +322,80 @@ class BaseRequest(BaseCommand):
                 raise
             sys.exit(1)
         else:
-            BaseCommand._handle_cli_exception(self, err)
+            BaseCommand.handle_cli_exception(self, err)
+
+    def __build_filter_help(self, force=False):
+        '''
+        Return a pre-formatted help string for all of the filters defined in
+        self.Filters.  The result is meant to be used as command line help
+        output.
+        '''
+        # Does not have access to self.config
+        if '-h' not in sys.argv and '--help' not in sys.argv and not force:
+            # Performance optimization
+            return ''
+
+        ## FIXME:  This code has a bug with triple-quoted strings that contain
+        ##         embedded indentation.  textwrap.dedent doesn't seem to help.
+        ##         Reproducer: 'whether the   volume will be deleted'
+        max_len = 24
+        col_len = max([len(filter_obj.name) for filter_obj in self.Filters
+                       if len(filter_obj.name) < max_len]) - 1
+        helplines = ['available filter names:']
+        for filter_obj in self.Filters:
+            if filter_obj.help:
+                if len(filter_obj.name) <= col_len:
+                    # filter-name    Description of the filter that
+                    #                continues on the next line
+                    right_space = ' ' * (max_len - len(filter_obj.name) - 2)
+                    wrapper = textwrap.TextWrapper(fix_sentence_endings=True,
+                        initial_indent=('  ' + filter_obj.name + right_space),
+                        subsequent_indent=(' ' * max_len))
+                else:
+                    # really-long-filter-name
+                    #                Description that begins on the next line
+                    helplines.append('  ' + filter_obj.name)
+                    wrapper = textwrap.TextWrapper(fix_sentence_endings=True,
+                            initial_indent=(   ' ' * max_len),
+                            subsequent_indent=(' ' * max_len))
+                helplines.extend(wrapper.wrap(filter_obj.help))
+            else:
+                helplines.append('  ' + filter_obj.name)
+        return '\n'.join(helplines)
+
+
+def _parse_filter(filter_str, filter_objs=None):
+    '''
+    Given a "key=value" string given as a command line parameter, return a pair
+    with the matching filter's dest member and the given value after converting
+    it to the type expected by the filter.  If this is impossible, an
+    ArgumentTypeError will result instead.
+    '''
+    # Find the appropriate filter object
+    filter_objs = [obj for obj in (filter_objs or [])
+                   if obj.matches_argval(filter_str)]
+    if not filter_objs:
+        msg = '"{0}" matches no available filters'.format(filter_str)
+        raise argparse.ArgumentTypeError(msg)
+    return filter_objs[0].convert(filter_str)
+
+
+def _process_filters(cli_filters):
+    '''
+    Change filters from the [(key, value), ...] format given at the command
+    line to [{'Name': key, 'Value': [value, ...]}, ...] format, which
+    flattens to the form the server expects.
+    '''
+    filter_args = {}
+    # Compile [(key, value), ...] pairs into {key: [value, ...], ...}
+    for (key, val) in cli_filters or {}:
+        filter_args.setdefault(key, [])
+        filter_args[key].append(val)
+    # Build the flattenable [{'Name': key, 'Value': [value, ...]}, ...]
+    filters = [{'Name': name, 'Value': values} for (name, values)
+               in filter_args.iteritems()]
+    return filters
+
 
 class _IteratorFileObjAdapter(object):
     def __init__(self, source):
@@ -344,6 +444,7 @@ class _IteratorFileObjAdapter(object):
                 result = result[:-extra_len]
         return result
 
+
 class _ReadLoggingFileWrapper(object):
     def __init__(self, fileobj, logger, level):
         self.fileobj = fileobj
@@ -354,5 +455,6 @@ class _ReadLoggingFileWrapper(object):
         chunk = self.fileobj.read(size)
         self.logger.log(self.level, chunk, extra={'append': True})
         return chunk
+
 
 _ALWAYS = type('_ALWAYS', (), {'__repr__': lambda self: '_ALWAYS'})()
