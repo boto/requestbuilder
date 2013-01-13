@@ -300,6 +300,7 @@ class BaseRequest(BaseCommand):
         return response_dict[response_dict.keys()[0]]
 
     def main(self):
+        ## TODO:  update docstring
         '''
         The main processing method for this type of request.  In this method,
         inheriting classes generally populate self.headers, self.params, and
@@ -308,7 +309,16 @@ class BaseRequest(BaseCommand):
         behavior is to simply return the result of a request with everything
         that routes to PARAMS.
         '''
-        return self.send()
+        self.preprocess()
+        response = self.send()
+        self.postprocess(response)
+        return response
+
+    def preprocess(self):
+        pass
+
+    def postprocess(self, response):
+        pass
 
     def handle_cli_exception(self, err):
         if isinstance(err, ServerError):
