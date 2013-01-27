@@ -183,9 +183,6 @@ class BaseCommand(object):
         except Exception as err:
             cmd.handle_cli_exception(err)
 
-    ## TODO:  backward compat; remove this
-    do_cli = run
-
     def configure_global_logging(self):
         if self.config.get_global_option('debug') in ('color', 'colour'):
             configure_root_logger(use_color=True)
