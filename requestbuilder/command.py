@@ -70,7 +70,7 @@ class BaseCommand(object):
                 help='show debugging output'),
             Arg('--debugger', action='store_true', route_to=None,
                 help='enable interactive debugger on error')]
-    DefaultRoute = None
+    DEFAULT_ROUTE = None
     ConfigFiles = ['/etc/requestbuilder.ini']
 
     def __init__(self, _do_cli=False, **kwargs):
@@ -155,7 +155,7 @@ class BaseCommand(object):
             else:
                 arg = parser.add_argument(*arglike_obj.pargs,
                                           **arglike_obj.kwargs)
-                route = getattr(arglike_obj, 'route', self.DefaultRoute)
+                route = getattr(arglike_obj, 'route', self.DEFAULT_ROUTE)
                 self._arg_routes.setdefault(route, [])
                 self._arg_routes[route].append(arg.dest)
                 return [arg]

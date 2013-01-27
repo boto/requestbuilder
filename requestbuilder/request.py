@@ -72,7 +72,7 @@ class BaseRequest(BaseCommand):
     Action       = None
 
     FILTERS = []
-    DefaultRoute = PARAMS
+    DEFAULT_ROUTE = PARAMS
 
     ListDelims = []
 
@@ -113,8 +113,8 @@ class BaseRequest(BaseCommand):
         BaseCommand._process_cli_args(self)
         if 'filters' in self.args:
             self.args['Filter'] = _process_filters(self.args.pop('filters'))
-            self._arg_routes.setdefault(self.DefaultRoute, [])
-            self._arg_routes[self.DefaultRoute].append('Filter')
+            self._arg_routes.setdefault(self.DEFAULT_ROUTE, [])
+            self._arg_routes[self.DEFAULT_ROUTE].append('Filter')
 
     @property
     def name(self):
