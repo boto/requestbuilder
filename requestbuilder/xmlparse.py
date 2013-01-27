@@ -17,16 +17,16 @@ try:
 except ImportError:
     from xml.etree import ElementTree
 
-def parse_aws_xml(xml_stream, list_items=None):
+def parse_aws_xml(xml_stream, list_item_markers=None):
     '''
     Parse a stream of XML and return a nested dict.  The dict represents each
     XML element with a key that matches the element's name and a value of
     another dict if the element contains at least one child element, or the
     element's text if it does not.
 
-    For each element whose name appears in the list_items list, its dict value
-    will instead be a list that aggregates the values of every element with
-    that name.
+    For each element whose name appears in the list_item_markers list, its dict
+    value will instead be a list that aggregates the values of every element
+    with that name.
 
     This function is designed to parse XML from AWS services that include list
     items alongside other elements, such as S3.
@@ -45,8 +45,8 @@ def parse_aws_xml(xml_stream, list_items=None):
     '''
     # One fundamental assumption we make here is that elements contain text
     # xor other elements.
-    if list_items is None:
-        list_items = ()
+    if list_item_markers is None:
+        list_item_markers = ()
     stack = [(None, {})]
     for event, elem in ElementTree.iterparse(xml_stream,
                                              events=('start', 'end')):
@@ -54,7 +54,7 @@ def parse_aws_xml(xml_stream, list_items=None):
         if event == 'start':
             stack.append((tag, {}))
         if event == 'end':
-            if tag in list_items:
+            if tag in list_item_markers:
                 # We're ending a list item, so append it to stack[-2]'s list
                 stack[-2][1].setdefault(tag, [])
                 if stack[-1][1] == {}:
@@ -72,16 +72,16 @@ def parse_aws_xml(xml_stream, list_items=None):
             elem.clear()
     return stack[0][1]
 
-def parse_listdelimited_aws_xml(xml_stream, list_delims=None):
+def parse_listdelimited_aws_xml(xml_stream, list_markers=None):
     '''
     Parse a stream of XML and return a nested dict.  The dict represents each
     XML element with a key that matches the element's name and a value of
     another dict if the element contains at least one child element, or the
     element's text if it does not.
 
-    For each element whose name appears in the list_delims list, its dict value
-    will instead be a list that aggregates the values of each of that element's
-    children.
+    For each element whose name appears in the list_markers list, its dict
+    value will instead be a list that aggregates the values of each of that
+    element's children.
 
     This function is designed to parse XML from AWS services that explicitly
     start and end lists with their own elements, such as EC2.
@@ -100,14 +100,14 @@ def parse_listdelimited_aws_xml(xml_stream, list_delims=None):
     '''
     # One fundamental assumption we make here is that elements contain text
     # xor other elements.
-    if list_delims is None:
-        list_delims = ()
+    if list_markers is None:
+        list_markers = ()
     stack = [(None, {})]
     for event, elem in ElementTree.iterparse(xml_stream,
                                              events=('start', 'end')):
         tag = _strip_tag(elem.tag)
         if event == 'start':
-            if tag in list_delims:
+            if tag in list_markers:
                 # Start a new list
                 stack.append((tag, []))
             else:

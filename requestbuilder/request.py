@@ -74,7 +74,7 @@ class BaseRequest(BaseCommand):
     FILTERS = []
     DEFAULT_ROUTE = PARAMS
 
-    ListDelims = []
+    LIST_MARKERS = []
 
 
     def __init__(self, **kwargs):
@@ -293,7 +293,7 @@ class BaseRequest(BaseCommand):
             logged_fileobj = _ReadLoggingFileWrapper(content_fileobj, self.log,
                                                      logging.DEBUG)
             response_dict = parse_listdelimited_aws_xml(logged_fileobj,
-                                                        self.ListDelims)
+                                                        self.LIST_MARKERS)
         self.log.debug('-- end of response content --')
         # Strip off the root element
         return response_dict[response_dict.keys()[0]]
