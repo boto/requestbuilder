@@ -23,7 +23,7 @@ from .auth import QuerySignatureV2Auth
 from .exceptions import ClientError, ServiceInitError
 
 class BaseService(object):
-    Name        = ''
+    NAME        = ''
     DESCRIPTION = ''
     API_VERSION = ''
     MaxRetries  = 4
@@ -91,7 +91,7 @@ class BaseService(object):
 
     def read_requestbuilder_config(self):
         self._set_url_vars(self.config.get_region_option(self.regionspec,
-                                                         self.Name + '-url'))
+                                                         self.NAME + '-url'))
         secret_key = self.config.get_user_option(self.regionspec, 'secret-key')
         if secret_key and not self._auth_args.get('secret_key'):
             self._auth_args['secret_key'] = secret_key
