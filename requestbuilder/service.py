@@ -29,7 +29,7 @@ class BaseService(object):
     MAX_RETRIES = 4
 
     AUTH_CLASS = QuerySignatureV2Auth
-    EnvURL    = 'AWS_URL'  # endpoint URL
+    ENV_URL    = 'AWS_URL'  # endpoint URL
 
     def __init__(self, config, log, url=None, regionspec=None, auth_args=None,
                  session_args=None):
@@ -71,7 +71,7 @@ class BaseService(object):
         to populate self.endpoint_url, self.regionspec, and self._auth_args.
 
         This method's configuration sources are, in order:
-          - An environment variable with the same name as self.EnvURL
+          - An environment variable with the same name as self.ENV_URL
           - An AWS credential file, from the path given in the
             AWS_CREDENTIAL_FILE environment variable
           - Requestbuilder configuration files, from paths given in
@@ -83,8 +83,8 @@ class BaseService(object):
         sources.
         '''
         # Try the environment first
-        if self.EnvURL in os.environ:
-            self._set_url_vars(os.getenv(self.EnvURL, None))
+        if self.ENV_URL in os.environ:
+            self._set_url_vars(os.getenv(self.ENV_URL, None))
         # Read config files from their default locations
         self.read_aws_credential_file()
         self.read_requestbuilder_config()
