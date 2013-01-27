@@ -25,7 +25,7 @@ from .exceptions import ClientError, ServiceInitError
 class BaseService(object):
     Name        = ''
     Description = ''
-    APIVersion  = ''
+    API_VERSION = ''
     MaxRetries  = 4
 
     AuthClass = QuerySignatureV2Auth
@@ -131,8 +131,8 @@ class BaseService(object):
             params['Action'] = action
         if api_version:
             params['Version'] = api_version
-        elif self.APIVersion:
-            params['Version'] = self.APIVersion
+        elif self.API_VERSION:
+            params['Version'] = self.API_VERSION
 
         ## TODO:  test url-encoding
         if path:

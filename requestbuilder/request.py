@@ -49,26 +49,26 @@ class BaseRequest(BaseCommand):
 
     Important members of this class include:
      - ServiceClass: a class corresponding to the web service in use
-     - APIVersion:   the API version to send along with the request.  This is
-                     only necessary to override the service class's API version
-                     for a specific request.
-     - Action:       a string containing the Action query parameter.  This
-                     defaults to the class's name.
-     - Description:  a string describing the tool.  This becomes part of the
-                     command line help string.
-     - ARGS:         a list of Arg and/or MutuallyExclusiveArgGroup objects
-                     are used to generate command line arguments.  Inheriting
-                     classes needing to add command line arguments should
-                     contain their own Args lists, which are *prepended* to
-                     those of their parent classes.
-     - FILTERS:      a list of Filter objects that are used to generate filter
-                     options at the command line.  Inheriting classes needing
-                     to add filters should contain their own FILTERS lists,
-                     which are *prepended* to those of their parent classes.
+     - API_VERSION:   the API version to send along with the request.  This is
+                      only necessary to override the service class's API
+                      version for a specific request.
+     - Action:        a string containing the Action query parameter.  This
+                      defaults to the class's name.
+     - Description:   a string describing the tool.  This becomes part of the
+                      command line help string.
+     - ARGS:          a list of Arg and/or MutuallyExclusiveArgGroup objects
+                      are used to generate command line arguments.  Inheriting
+                      classes needing to add command line arguments should
+                      contain their own Args lists, which are *prepended* to
+                      those of their parent classes.
+     - FILTERS:       a list of Filter objects that are used to generate filter
+                      options at the command line.  Inheriting classes needing
+                      to add filters should contain their own FILTERS lists,
+                      which are *prepended* to those of their parent classes.
     '''
 
     ServiceClass = BaseService
-    APIVersion   = None
+    API_VERSION  = None
     Action       = None
 
     FILTERS = []
@@ -259,7 +259,7 @@ class BaseRequest(BaseCommand):
         self.log.info('parameters: %s', params)
         self.response = self.service.make_request(self.name,
                 method=self.method, headers=headers, params=params,
-                data=self.post_data, api_version=self.APIVersion)
+                data=self.post_data, api_version=self.API_VERSION)
         try:
             if 200 <= self.response.status_code < 300:
                 parsed = self.parse_response(self.response)
