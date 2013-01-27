@@ -54,7 +54,7 @@ class BaseRequest(BaseCommand):
                       version for a specific request.
      - Action:        a string containing the Action query parameter.  This
                       defaults to the class's name.
-     - Description:   a string describing the tool.  This becomes part of the
+     - DESCRIPTION:   a string describing the tool.  This becomes part of the
                       command line help string.
      - ARGS:          a list of Arg and/or MutuallyExclusiveArgGroup objects
                       are used to generate command line arguments.  Inheriting

@@ -24,7 +24,7 @@ from .exceptions import ClientError, ServiceInitError
 
 class BaseService(object):
     Name        = ''
-    Description = ''
+    DESCRIPTION = ''
     API_VERSION = ''
     MaxRetries  = 4
 

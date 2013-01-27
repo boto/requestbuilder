@@ -53,7 +53,7 @@ class BaseCommand(object):
     instead supply arguments via __init__() and then call main() alone.
 
     Important members of this class include:
-     - Description:  a string describing the tool.  This becomes part of the
+     - DESCRIPTION:  a string describing the tool.  This becomes part of the
                      command line help string.
      - Args:         a list of Arg and/or MutuallyExclusiveArgGroup objects
                      are used to generate command line arguments.  Inheriting
@@ -64,7 +64,7 @@ class BaseCommand(object):
 
     VERSION = 'requestbuilder ' + __version__
 
-    Description = ''
+    DESCRIPTION = ''
 
     ARGS = [Arg('-D', '--debug', action='store_true', route_to=None,
                 help='show debugging output'),
@@ -119,7 +119,7 @@ class BaseCommand(object):
     def _build_parser(self):
         # Does not have access to self.config
         description = '\n\n'.join([textwrap.fill(textwrap.dedent(para))
-                                   for para in self.Description.split('\n\n')])
+                                   for para in self.DESCRIPTION.split('\n\n')])
         parser = argparse.ArgumentParser(description=description,
                 formatter_class=argparse.RawDescriptionHelpFormatter)
         self._allowed_args = self._populate_parser(parser)
