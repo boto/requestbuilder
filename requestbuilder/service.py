@@ -26,7 +26,7 @@ class BaseService(object):
     NAME        = ''
     DESCRIPTION = ''
     API_VERSION = ''
-    MaxRetries  = 4
+    MAX_RETRIES = 4
 
     AuthClass = QuerySignatureV2Auth
     EnvURL    = 'AWS_URL'  # endpoint URL
@@ -147,7 +147,7 @@ class BaseService(object):
 
         hooks = {'pre_send':     _log_request_data(self.log),
                  'response':     _log_response_data(self.log),
-                 'post_request': RetryOnStatuses((500, 503), self.MaxRetries,
+                 'post_request': RetryOnStatuses((500, 503), self.MAX_RETRIES,
                                                   logger=self.log)}
 
         try:
