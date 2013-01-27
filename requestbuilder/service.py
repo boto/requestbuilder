@@ -28,7 +28,7 @@ class BaseService(object):
     API_VERSION = ''
     MAX_RETRIES = 4
 
-    AuthClass = QuerySignatureV2Auth
+    AUTH_CLASS = QuerySignatureV2Auth
     EnvURL    = 'AWS_URL'  # endpoint URL
 
     def __init__(self, config, log, url=None, regionspec=None, auth_args=None,
@@ -62,7 +62,7 @@ class BaseService(object):
                 errmsg += ', '.join(sorted(self.config.regions.keys()))
             raise ServiceInitError(errmsg)
 
-        auth = self.AuthClass(self, **self._auth_args)
+        auth = self.AUTH_CLASS(self, **self._auth_args)
         self.session = requests.session(auth=auth, **self._session_args)
 
     def read_config(self):
