@@ -52,7 +52,7 @@ class BaseRequest(BaseCommand):
      - API_VERSION:   the API version to send along with the request.  This is
                       only necessary to override the service class's API
                       version for a specific request.
-     - Action:        a string containing the Action query parameter.  This
+     - ACTION:        a string containing the Action query parameter.  This
                       defaults to the class's name.
      - DESCRIPTION:   a string describing the tool.  This becomes part of the
                       command line help string.
@@ -69,7 +69,7 @@ class BaseRequest(BaseCommand):
 
     SERVICE_CLASS = BaseService
     API_VERSION   = None
-    Action        = None
+    ACTION        = None
 
     FILTERS = []
     DEFAULT_ROUTE = PARAMS
@@ -122,7 +122,7 @@ class BaseRequest(BaseCommand):
         The name of this action.  Used when choosing what to supply for the
         Action query parameter.
         '''
-        return self.Action or self.__class__.__name__
+        return self.ACTION or self.__class__.__name__
 
     @property
     def user_agent(self):
