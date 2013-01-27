@@ -48,7 +48,7 @@ class BaseRequest(BaseCommand):
     instead supply arguments via __init__() and then call main() alone.
 
     Important members of this class include:
-     - ServiceClass: a class corresponding to the web service in use
+     - SERVICE_CLASS: a class corresponding to the web service in use
      - API_VERSION:   the API version to send along with the request.  This is
                       only necessary to override the service class's API
                       version for a specific request.
@@ -67,9 +67,9 @@ class BaseRequest(BaseCommand):
                       which are *prepended* to those of their parent classes.
     '''
 
-    ServiceClass = BaseService
-    API_VERSION  = None
-    Action       = None
+    SERVICE_CLASS = BaseService
+    API_VERSION   = None
+    Action        = None
 
     FILTERS = []
     DEFAULT_ROUTE = PARAMS
@@ -149,8 +149,8 @@ class BaseRequest(BaseCommand):
                     service_args['auth_args'][key] = val
                 elif key in self._arg_routes.get(SESSION, []):
                     service_args['session_args'][key] = val
-            self._service = self.ServiceClass(self.config, self.log,
-                                              **service_args)
+            self._service = self.SERVICE_CLASS(self.config, self.log,
+                                               **service_args)
         return self._service
 
     @property
