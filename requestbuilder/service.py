@@ -75,7 +75,7 @@ class BaseService(object):
           - An AWS credential file, from the path given in the
             AWS_CREDENTIAL_FILE environment variable
           - Requestbuilder configuration files, from paths given in
-            self.ConfigFiles
+            self.CONFIG_FILES
 
         Of these, earlier sources take precedence over later sources.
 

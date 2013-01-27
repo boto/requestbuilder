@@ -71,7 +71,7 @@ class BaseCommand(object):
             Arg('--debugger', action='store_true', route_to=None,
                 help='enable interactive debugger on error')]
     DEFAULT_ROUTE = None
-    ConfigFiles = ['/etc/requestbuilder.ini']
+    CONFIG_FILES = ['/etc/requestbuilder.ini']
 
     def __init__(self, _do_cli=False, **kwargs):
         # Note to programmer:  when run() is initializing the first object it
@@ -202,7 +202,7 @@ class BaseCommand(object):
             if getattr(BaseCommand, '__INHIBIT_CONFIG_PARSING', False):
                 raise AssertionError(
                         'config files may not be parsed during __init__')
-            self._config = Config(self.ConfigFiles, log=self.log)
+            self._config = Config(self.CONFIG_FILES, log=self.log)
             # Now that we have a config file we should check to see if it wants
             # us to turn on debugging
             if self.__config_enables_debugging():
