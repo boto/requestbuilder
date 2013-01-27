@@ -62,7 +62,7 @@ class BaseCommand(object):
                      those of their parent classes.
     '''
 
-    Version = 'requestbuilder ' + __version__
+    VERSION = 'requestbuilder ' + __version__
 
     Description = ''
 
@@ -124,7 +124,7 @@ class BaseCommand(object):
                 formatter_class=argparse.RawDescriptionHelpFormatter)
         self._allowed_args = self._populate_parser(parser)
         parser.add_argument('--version', action='version',
-                            version=self.Version)  # doesn't need routing
+                            version=self.VERSION)  # doesn't need routing
         self._cli_parser = parser
 
     def _populate_parser(self, parser):
