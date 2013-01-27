@@ -56,14 +56,14 @@ class BaseRequest(BaseCommand):
                      defaults to the class's name.
      - Description:  a string describing the tool.  This becomes part of the
                      command line help string.
-     - Args:         a list of Arg and/or MutuallyExclusiveArgGroup objects
+     - ARGS:         a list of Arg and/or MutuallyExclusiveArgGroup objects
                      are used to generate command line arguments.  Inheriting
                      classes needing to add command line arguments should
                      contain their own Args lists, which are *prepended* to
                      those of their parent classes.
-     - Filters:      a list of Filter objects that are used to generate filter
+     - FILTERS:      a list of Filter objects that are used to generate filter
                      options at the command line.  Inheriting classes needing
-                     to add filters should contain their own Filters lists,
+                     to add filters should contain their own FILTERS lists,
                      which are *prepended* to those of their parent classes.
     '''
 
@@ -71,8 +71,7 @@ class BaseRequest(BaseCommand):
     APIVersion   = None
     Action       = None
 
-    ## TODO:  rename Filters -> FILTERS
-    Filters = []
+    FILTERS = []
     DefaultRoute = PARAMS
 
     ListDelims = []
@@ -98,11 +97,11 @@ class BaseRequest(BaseCommand):
     def _populate_parser(self, parser):
         # Does not have access to self.config
         args = BaseCommand._populate_parser(self, parser)
-        if self.Filters:
+        if self.FILTERS:
             args.append(parser.add_argument('--filter', metavar='NAME=VALUE',
                         action='append', dest='filters',
                         help='restrict results to those that meet criteria',
-                        type=partial(_parse_filter, filter_objs=self.Filters)))
+                        type=partial(_parse_filter, filter_objs=self.FILTERS)))
             parser.epilog = self.__build_filter_help()
             self._arg_routes.setdefault(None, [])
             self._arg_routes[None].append('filters')
@@ -337,7 +336,7 @@ class BaseRequest(BaseCommand):
     def __build_filter_help(self, force=False):
         '''
         Return a pre-formatted help string for all of the filters defined in
-        self.Filters.  The result is meant to be used as command line help
+        self.FILTERS.  The result is meant to be used as command line help
         output.
         '''
         # Does not have access to self.config
@@ -349,10 +348,10 @@ class BaseRequest(BaseCommand):
         ##         embedded indentation.  textwrap.dedent doesn't seem to help.
         ##         Reproducer: 'whether the   volume will be deleted'
         max_len = 24
-        col_len = max([len(filter_obj.name) for filter_obj in self.Filters
+        col_len = max([len(filter_obj.name) for filter_obj in self.FILTERS
                        if len(filter_obj.name) < max_len]) - 1
         helplines = ['available filter names:']
-        for filter_obj in self.Filters:
+        for filter_obj in self.FILTERS:
             if filter_obj.help:
                 if len(filter_obj.name) <= col_len:
                     # filter-name    Description of the filter that

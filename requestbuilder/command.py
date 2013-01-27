@@ -32,22 +32,6 @@ from . import __version__, Arg, MutuallyExclusiveArgList
 from .config import Config
 from .logging import configure_root_logger
 
-class InheritableCommandClass(type):
-    '''
-    Classes of this type allow one to specify 'Args' and 'Filters' lists as
-    attributes of classes and have them be appended to their superclasses'
-    rather than clobbering them.
-    '''
-    def __new__(mcs, name, bases, attrs):
-        for attrname in ('Args', 'Filters'):
-            if attrname in attrs:
-                for base in bases:
-                    for attr in getattr(base, attrname, []):
-                        if attr not in attrs[attrname]:
-                            attrs[attrname].append(attr)
-        return type.__new__(mcs, name, bases, attrs)
-
-
 class BaseCommand(object):
     ## TODO:  Fix this docstring
     '''
@@ -78,12 +62,11 @@ class BaseCommand(object):
                      those of their parent classes.
     '''
 
-    __metaclass__ = InheritableCommandClass
     Version = 'requestbuilder ' + __version__
 
     Description = ''
 
-    Args = [Arg('-D', '--debug', action='store_true', route_to=None,
+    ARGS = [Arg('-D', '--debug', action='store_true', route_to=None,
                 help='show debugging output'),
             Arg('--debugger', action='store_true', route_to=None,
                 help='enable interactive debugger on error')]
@@ -147,9 +130,8 @@ class BaseCommand(object):
     def _populate_parser(self, parser):
         # Returns the args the parser was populated with  <-- FIXME (the docs)
         # Does not have access to self.config
-        ## TODO:  rename Args -> ARGS
         args = []
-        for arg_obj in self.Args:
+        for arg_obj in self.aggregate_subclass_fields('ARGS'):
             args.extend(self.__add_arg_to_cli_parser(arg_obj, parser))
         return args
 
@@ -274,6 +256,14 @@ class BaseCommand(object):
         if self.debug:
             raise
         sys.exit(1)
+
+    @classmethod
+    def aggregate_subclass_fields(cls, field_name):
+        values = []
+        for m_class in cls.mro():
+            if field_name in vars(m_class):
+                values.extend(getattr(m_class, field_name))
+        return values
 
     def __config_enables_debugging(self):
         if self._config.get_global_option('debug') in ('color', 'colour'):
