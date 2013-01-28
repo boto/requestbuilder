@@ -122,16 +122,23 @@ class BaseCommand(object):
                                    for para in self.DESCRIPTION.split('\n\n')])
         parser = argparse.ArgumentParser(description=description,
                 formatter_class=argparse.RawDescriptionHelpFormatter)
-        self._allowed_args = self._populate_parser(parser)
+        arg_objs = self.collect_arg_objs()
+        ## FIXME:  _allowed_args is full of argparse args, but __init__ thinks it's full of strings
+        self._allowed_args = self.populate_parser(parser, arg_objs)
         parser.add_argument('--version', action='version',
                             version=self.VERSION)  # doesn't need routing
         self._cli_parser = parser
 
-    def _populate_parser(self, parser):
+    @classmethod
+    def collect_arg_objs(cls):
+        ## TODO:  leave notes on how to override this
+        return aggregate_subclass_fields(cls, 'ARGS')
+
+    def populate_parser(self, parser, arg_objs):
         # Returns the args the parser was populated with  <-- FIXME (the docs)
         # Does not have access to self.config
         args = []
-        for arg_obj in self.aggregate_subclass_fields('ARGS'):
+        for arg_obj in arg_objs:
             args.extend(self.__add_arg_to_cli_parser(arg_obj, parser))
         return args
 
@@ -254,22 +261,22 @@ class BaseCommand(object):
             raise
         sys.exit(1)
 
-    @classmethod
-    def aggregate_subclass_fields(cls, field_name):
-        values = []
-        # pylint doesn't know about classes' built-in mro() method
-        # pylint: disable-msg=E1101
-        for m_class in cls.mro():
-            # pylint: enable-msg=E1101
-            if field_name in vars(m_class):
-                values.extend(getattr(m_class, field_name))
-        return values
-
     def __config_enables_debugging(self):
         if self._config.get_global_option('debug') in ('color', 'colour'):
             # It isn't boolean, but still counts as true.
             return True
         return self._config.get_global_option_bool('debug', False)
+
+
+def aggregate_subclass_fields(cls, field_name):
+    values = []
+    # pylint doesn't know about classes' built-in mro() method
+    # pylint: disable-msg=E1101
+    for m_class in cls.mro():
+        # pylint: enable-msg=E1101
+        if field_name in vars(m_class):
+            values.extend(getattr(m_class, field_name))
+    return values
 
 
 def _debugger_except_hook(debugger_enabled, debug_enabled):

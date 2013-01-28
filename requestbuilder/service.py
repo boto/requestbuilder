@@ -65,6 +65,11 @@ class BaseService(object):
         auth = self.AUTH_CLASS(self, **self._auth_args)
         self.session = requests.session(auth=auth, **self._session_args)
 
+    @classmethod
+    def collect_arg_objs(cls):
+        ## TODO:  implement this
+        return []
+
     def read_config(self):
         '''
         Read configuration from the environment, files, and so on and use them

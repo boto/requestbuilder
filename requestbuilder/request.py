@@ -94,9 +94,16 @@ class BaseRequest(BaseCommand):
         self._service     = None
         self.__user_agent = None
 
-    def _populate_parser(self, parser):
+    @classmethod
+    def collect_arg_objs(cls):
+        request_args = super(BaseRequest, cls).collect_arg_objs()
+        service_args = cls.SERVICE_CLASS.collect_arg_objs()
+        # Note that the service is likely to include auth args of its own.
+        return request_args + service_args
+
+    def populate_parser(self, parser, arg_objs):
         # Does not have access to self.config
-        args = BaseCommand._populate_parser(self, parser)
+        args = BaseCommand.populate_parser(self, parser, arg_objs)
         if self.FILTERS:
             args.append(parser.add_argument('--filter', metavar='NAME=VALUE',
                         action='append', dest='filters',
