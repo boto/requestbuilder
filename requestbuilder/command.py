@@ -1,4 +1,4 @@
-# Copyright (c) 2012, Eucalyptus Systems, Inc.
+# Copyright (c) 2012-2013, Eucalyptus Systems, Inc.
 #
 # Permission to use, copy, modify, and/or distribute this software for
 # any purpose with or without fee is hereby granted, provided that the
@@ -16,9 +16,7 @@ from __future__ import absolute_import
 
 import argparse
 import bdb
-import json
 import logging
-import pprint
 import sys
 import textwrap
 import traceback
@@ -218,24 +216,7 @@ class BaseCommand(object):
         return self.__class__.__name__
 
     def print_result(self, data):
-        '''
-        Format data for printing at the command line and print it to standard
-        out.  The default formatter attempts to print JSON or something else
-        reasonable.  Override this method if you want specific formatting.
-        '''
-        ## TODO:  make this a noop
-        if data:
-            if isinstance(data, dict):
-                for (key, val) in data.iteritems():
-                    if key not in ['ResponseMetadata', 'requestId']:
-                        # Will there ever be more than one of these?
-                        print json.dumps(val, indent=4)
-            elif isinstance(data, list):
-                print '\n'.join([str(item) for item in data])
-            elif isinstance(data, basestring):
-                print data
-            else:
-                pprint.pprint(data)
+        pass
 
     def main(self):
         '''
