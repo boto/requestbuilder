@@ -1,4 +1,4 @@
-# Copyright (c) 2012, Eucalyptus Systems, Inc.
+# Copyright (c) 2012-2013, Eucalyptus Systems, Inc.
 #
 # Permission to use, copy, modify, and/or distribute this software for
 # any purpose with or without fee is hereby granted, provided that the
@@ -13,14 +13,11 @@
 # OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 
+import io
 try:
     from xml.etree import cElementTree as ElementTree
 except ImportError:
     from xml.etree import ElementTree
-try:
-    import cStringIO as StringIO
-except ImportError:
-    import StringIO
 
 class ClientError(Exception):
     '''
@@ -59,7 +56,7 @@ class ServerError(RuntimeError):
 
         if self.body:
             try:
-                xml_stream = StringIO.StringIO(self.body)
+                xml_stream = io.StringIO(self.body)
                 for event, elem in ElementTree.iterparse(xml_stream,
                                                          events=('end',)):
                     if elem.tag == 'Code':

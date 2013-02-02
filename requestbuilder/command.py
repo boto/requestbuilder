@@ -31,7 +31,6 @@ from .config import Config
 from .logging import configure_root_logger
 
 class BaseCommand(object):
-    ## TODO:  Fix this docstring
     '''
     The basis for a command line tool.  To invoke this as a command line tool,
     call the do_cli() method on an instance of the class; arguments will be

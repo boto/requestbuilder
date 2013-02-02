@@ -1,4 +1,4 @@
-# Copyright (c) 2012, Eucalyptus Systems, Inc.
+# Copyright (c) 2012-2013, Eucalyptus Systems, Inc.
 #
 # Permission to use, copy, modify, and/or distribute this software for
 # any purpose with or without fee is hereby granted, provided that the
@@ -150,6 +150,7 @@ class BaseService(object):
         else:
             url = self.endpoint_url
 
+        ## TODO:  replace pre_send and post_request hooks for use with requests 1
         hooks = {'pre_send':     _log_request_data(self.log),
                  'response':     _log_response_data(self.log),
                  'post_request': RetryOnStatuses((500, 503), self.MAX_RETRIES,
@@ -195,6 +196,7 @@ class RetryOnStatuses(object):
             request.response.history = (orig_response.history +
                     [orig_response] + request.response.history)
 
+
 def _log_request_data(logger):
     def __log_request_data(request):
         logger.debug('request method: %s', request.method)
@@ -209,6 +211,7 @@ def _log_request_data(logger):
             for key, val in sorted(request.data.iteritems()):
                 logger.debug('request data:   %s: %s', key, val)
     return __log_request_data
+
 
 def _log_response_data(logger):
     def __log_response_data(response):

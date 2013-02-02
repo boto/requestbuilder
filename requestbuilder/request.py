@@ -1,4 +1,4 @@
-# Copyright (c) 2012, Eucalyptus Systems, Inc.
+# Copyright (c) 2012-2013, Eucalyptus Systems, Inc.
 #
 # Permission to use, copy, modify, and/or distribute this software for
 # any purpose with or without fee is hereby granted, provided that the
@@ -303,10 +303,9 @@ class BaseRequest(BaseCommand):
                                                         self.LIST_MARKERS)
         self.log.debug('-- end of response content --')
         # Strip off the root element
-        return response_dict[response_dict.keys()[0]]
+        return response_dict[list(response_dict.keys())[0]]
 
     def main(self):
-        ## TODO:  update docstring
         '''
         The main processing method for this type of request.  In this method,
         inheriting classes generally populate self.headers, self.params, and
@@ -351,13 +350,13 @@ class BaseRequest(BaseCommand):
             # Performance optimization
             return ''
 
-        ## FIXME:  This code has a bug with triple-quoted strings that contain
-        ##         embedded indentation.  textwrap.dedent doesn't seem to help.
-        ##         Reproducer: 'whether the   volume will be deleted'
+        # FIXME:  This code has a bug with triple-quoted strings that contain
+        #         embedded indentation.  textwrap.dedent doesn't seem to help.
+        #         Reproducer: 'whether the   volume will be deleted'
         max_len = 24
         col_len = max([len(filter_obj.name) for filter_obj in self.FILTERS
                        if len(filter_obj.name) < max_len]) - 1
-        helplines = ['available filter names:']
+        helplines = ['allowed filter names:']
         for filter_obj in self.FILTERS:
             if filter_obj.help:
                 if len(filter_obj.name) <= col_len:

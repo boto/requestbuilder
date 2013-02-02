@@ -1,4 +1,4 @@
-# Copyright (c) 2012, Eucalyptus Systems, Inc.
+# Copyright (c) 2012-2013, Eucalyptus Systems, Inc.
 #
 # Permission to use, copy, modify, and/or distribute this software for
 # any purpose with or without fee is hereby granted, provided that the
@@ -21,7 +21,7 @@ class TabifyingCommand(BaseCommand):
     associated --show-empty-fields command line arg.
     '''
 
-    Args = [Arg('--show-empty-fields', action='store_true', route_to=None,
+    ARGS = [Arg('--show-empty-fields', action='store_true', route_to=None,
                 help='show empty values as "(nil)"')]
 
     def tabify(self, fields, include=None):
