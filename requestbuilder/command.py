@@ -29,6 +29,7 @@ except ImportError:
 from . import __version__, Arg, MutuallyExclusiveArgList
 from .config import Config
 from .logging import configure_root_logger
+from .util import aggregate_subclass_fields
 
 class BaseCommand(object):
     '''
@@ -59,99 +60,121 @@ class BaseCommand(object):
                      those of their parent classes.
     '''
 
-    VERSION = 'requestbuilder ' + __version__
-
     DESCRIPTION = ''
-
     ARGS = [Arg('-D', '--debug', action='store_true', route_to=None,
                 help='show debugging output'),
             Arg('--debugger', action='store_true', route_to=None,
                 help='enable interactive debugger on error')]
-    DEFAULT_ROUTE = None
-    CONFIG_FILES = ['/etc/requestbuilder.ini']
+
+    VERSION = 'requestbuilder ' + __version__
 
     def __init__(self, _do_cli=False, **kwargs):
-        # Note to programmer:  when run() is initializing the first object it
-        # can't catch exceptions that may result from accesses to self.config.
-        # To deal with this, run() disables config file parsing during this
-        # process to expose premature access to self.config during testing.
-        self.args          = {}    # populated later
+        self.args          = kwargs
+        self.config        = None  # created by _process_configfile
         self.log           = None  # created by _configure_logging
-        self._allowed_args = None  # created by _build_parser
         self._arg_routes   = {}
         self._cli_parser   = None  # created by _build_parser
-        self._config       = None
 
         self._configure_logging()
+        self._process_configfiles()
+        if _do_cli:
+            self._configure_global_logging()
 
         # We need to enforce arg constraints in one location to make this
         # framework equally useful for chained commands and those driven
         # directly from the command line.  Thus, we do most of the parsing/
-        # validation work in __init__ as opposed to putting it off until
-        # we hit CLI-specific code.
+        # validation work before __init__ returns as opposed to putting it
+        # off until we hit CLI-specific code.
+        #
+        # Derived classes MUST call this method to ensure things stay sane.
+        self.__do_cli = _do_cli
+        self._post_init()
+
+    def _post_init(self):
         self._build_parser()
+        if self.__do_cli:
+            # Distribute CLI args to the various places that need them
+            self.process_cli_args()
+        self.configure()
 
-        # Come up with a list of args that the arg parser will allow
-        for key, val in kwargs.iteritems():
-            if key in self._allowed_args:
-                self.args[key] = val
-            else:
-                raise TypeError('__init__() got an unexpected keyword '
-                                'argument \'{0}\'; allowed arguments are {1}'
-                                .format(key, ', '.join(self._allowed_args)))
+    @property
+    def default_route(self):
+        # This is a property so we can return something that references self.
+        return None
 
-        ## TODO:  AUTH PARAM PASSING (probably involves the service class)
-        if _do_cli:
-            self._process_cli_args()
-        else:
-            # TODO:  enforce arg constraints when not pulling from the CLI
-            pass
+    @property
+    def config_files(self):
+        # This list may need to be computed on the fly.
+        return []
 
     def _configure_logging(self):
-        # Does not have access to self.config
         self.log = logging.getLogger(self.name)
         if self.debug:
             self.log.setLevel(logging.DEBUG)
 
+    def _process_configfiles(self):
+        self.config = Config(self.config_files, log=self.log)
+        # Now that we have a config file we should check to see if it wants
+        # us to turn on debugging
+        if self.__config_enables_debugging():
+            self.log.setLevel(logging.DEBUG)
+
+    def _configure_global_logging(self):
+        if self.config.get_global_option('debug') in ('color', 'colour'):
+            configure_root_logger(use_color=True)
+        else:
+            configure_root_logger()
+        if self.args.get('debugger'):
+            sys.excepthook = _debugger_except_hook(
+                    self.args.get('debugger', False),
+                    self.args.get('debug', False))
+
     def _build_parser(self):
-        # Does not have access to self.config
         description = '\n\n'.join([textwrap.fill(textwrap.dedent(para))
                                    for para in self.DESCRIPTION.split('\n\n')])
         parser = argparse.ArgumentParser(description=description,
                 formatter_class=argparse.RawDescriptionHelpFormatter)
         arg_objs = self.collect_arg_objs()
-        ## FIXME:  _allowed_args is full of argparse args, but __init__ thinks it's full of strings
-        self._allowed_args = self.populate_parser(parser, arg_objs)
+        self.preprocess_arg_objs(arg_objs)
+        self.populate_parser(parser, arg_objs)
         parser.add_argument('--version', action='version',
                             version=self.VERSION)  # doesn't need routing
         self._cli_parser = parser
 
-    @classmethod
-    def collect_arg_objs(cls):
-        ## TODO:  leave notes on how to override this
-        return aggregate_subclass_fields(cls, 'ARGS')
+    def collect_arg_objs(self):
+        return aggregate_subclass_fields(self.__class__, 'ARGS')
+
+    def preprocess_arg_objs(self, arg_objs):
+        pass
 
     def populate_parser(self, parser, arg_objs):
-        # Returns the args the parser was populated with  <-- FIXME (the docs)
-        # Does not have access to self.config
-        args = []
         for arg_obj in arg_objs:
-            args.extend(self.__add_arg_to_cli_parser(arg_obj, parser))
-        return args
+            self.__add_arg_to_cli_parser(arg_obj, parser)
 
-    def _process_cli_args(self):
+    def process_cli_args(self):
         '''
         Process CLI args to fill in missing parts of self.args and enable
         debugging if necessary.
         '''
-        # Does not have access to self.config
+
         cli_args = self._cli_parser.parse_args()
-        for (key, val) in vars(cli_args).iteritems():
-            self.args.setdefault(key, val)
+        for key, val in vars(cli_args).iteritems():
+            # Everything goes in self.args
+            self.args[key] = val
+
+            # If a location to route this to was supplied, put it there, too.
+            route = self._arg_routes[key]
+            if route is not None:
+                if callable(route):
+                    # If it's callable, call it to get the actual destination
+                    # dict.  This is needed to allow Arg objects to refer to
+                    # instance attributes from the context of the class.
+                    route = route(self)
+                # At this point we had better have a dict.
+                route[key] = val
 
     def __add_arg_to_cli_parser(self, arglike_obj, parser):
         # Returns the args the parser was populated with
-        # Does not have access to self.config
         if isinstance(arglike_obj, Arg):
             if arglike_obj.kwargs.get('dest') is argparse.SUPPRESS:
                 # Treat it like it doesn't exist at all
@@ -159,9 +182,8 @@ class BaseCommand(object):
             else:
                 arg = parser.add_argument(*arglike_obj.pargs,
                                           **arglike_obj.kwargs)
-                route = getattr(arglike_obj, 'route', self.DEFAULT_ROUTE)
-                self._arg_routes.setdefault(route, [])
-                self._arg_routes[route].append(arg.dest)
+                route = getattr(arglike_obj, 'route', self.default_route)
+                self._arg_routes[arg.dest] = route
                 return [arg]
         elif isinstance(arglike_obj, MutuallyExclusiveArgList):
             exgroup = parser.add_mutually_exclusive_group(
@@ -174,41 +196,28 @@ class BaseCommand(object):
             raise TypeError('Unknown argument type ' +
                             arglike_obj.__class__.__name__)
 
+    def configure(self):
+        # TODO:  Come up with something that can enforce arg constraints based
+        # on the info we can get from self._cli_parser
+        pass
+
     @classmethod
     def run(cls):
-        BaseCommand.__INHIBIT_CONFIG_PARSING = True
-        ## TODO:  document:  command line entry point
-        cmd = cls(_do_cli=True)
-        BaseCommand.__INHIBIT_CONFIG_PARSING = False
         try:
-            cmd.configure_global_logging()
+            cmd = cls(_do_cli=True)
+        except Exception as err:
+            print >> sys.stderr, 'error: {0}'.format(err)
+            # Since we don't even have a config file to consult our options for
+            # determining when debugging is on are limited to what we got at
+            # the command line.
+            if any(arg in sys.argv for arg in ('--debug', '-D', '--debugger')):
+                raise
+            sys.exit(1)
+        try:
             result = cmd.main()
             cmd.print_result(result)
         except Exception as err:
             cmd.handle_cli_exception(err)
-
-    def configure_global_logging(self):
-        if self.config.get_global_option('debug') in ('color', 'colour'):
-            configure_root_logger(use_color=True)
-        else:
-            configure_root_logger()
-        if self.args.get('debugger'):
-            sys.excepthook = _debugger_except_hook(
-                    self.args.get('debugger', False),
-                    self.args.get('debug', False))
-
-    @property
-    def config(self):
-        if not self._config:
-            if getattr(BaseCommand, '__INHIBIT_CONFIG_PARSING', False):
-                raise AssertionError(
-                        'config files may not be parsed during __init__')
-            self._config = Config(self.CONFIG_FILES, log=self.log)
-            # Now that we have a config file we should check to see if it wants
-            # us to turn on debugging
-            if self.__config_enables_debugging():
-                self.log.setLevel(logging.DEBUG)
-        return self._config
 
     @property
     def name(self):
@@ -226,7 +235,7 @@ class BaseCommand(object):
 
     @property
     def debug(self):
-        if self._config and self.__config_enables_debugging():
+        if self.__config_enables_debugging():
             return True
         if self.args.get('debug') or self.args.get('debugger'):
             return True
@@ -242,21 +251,12 @@ class BaseCommand(object):
         sys.exit(1)
 
     def __config_enables_debugging(self):
-        if self._config.get_global_option('debug') in ('color', 'colour'):
+        if self.config is None:
+            return False
+        if self.config.get_global_option('debug') in ('color', 'colour'):
             # It isn't boolean, but still counts as true.
             return True
-        return self._config.get_global_option_bool('debug', False)
-
-
-def aggregate_subclass_fields(cls, field_name):
-    values = []
-    # pylint doesn't know about classes' built-in mro() method
-    # pylint: disable-msg=E1101
-    for m_class in cls.mro():
-        # pylint: enable-msg=E1101
-        if field_name in vars(m_class):
-            values.extend(getattr(m_class, field_name))
-    return values
+        return self.config.get_global_option_bool('debug', False)
 
 
 def _debugger_except_hook(debugger_enabled, debug_enabled):

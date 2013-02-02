@@ -20,10 +20,11 @@ import platform
 import sys
 import textwrap
 
-from . import __version__, EMPTY, AUTH, PARAMS, SERVICE, SESSION
+from . import __version__, EMPTY
 from .command import BaseCommand
 from .exceptions import ClientError, ServerError
 from .service import BaseService
+from .util import aggregate_subclass_fields
 from .xmlparse import parse_listdelimited_aws_xml
 
 class BaseRequest(BaseCommand):
@@ -52,7 +53,7 @@ class BaseRequest(BaseCommand):
      - API_VERSION:   the API version to send along with the request.  This is
                       only necessary to override the service class's API
                       version for a specific request.
-     - ACTION:        a string containing the Action query parameter.  This
+     - NAME:          a string containing the Action query parameter.  This
                       defaults to the class's name.
      - DESCRIPTION:   a string describing the tool.  This becomes part of the
                       command line help string.
@@ -69,59 +70,65 @@ class BaseRequest(BaseCommand):
 
     SERVICE_CLASS = BaseService
     API_VERSION   = None
-    ACTION        = None
+    NAME          = None
 
     FILTERS = []
-    DEFAULT_ROUTE = PARAMS
-
     LIST_MARKERS = []
 
 
-    def __init__(self, **kwargs):
-        BaseCommand.__init__(self, **kwargs)
-
+    def __init__(self, service=None, **kwargs):
+        self.service = service
         # Parts of the HTTP request to be sent to the server.
         # Note that self.serialize_params will update self.params for each
         # entry in self.args that routes to PARAMS.
-        self.headers   = None
-        self.params    = None
+        self.headers   = {}
+        self.params    = {}
         self.post_data = None
         self.method    = 'GET'
 
         # HTTP response obtained from the server
         self.response = None
 
-        self._service     = None
         self.__user_agent = None
 
-    @classmethod
-    def collect_arg_objs(cls):
-        request_args = super(BaseRequest, cls).collect_arg_objs()
-        service_args = cls.SERVICE_CLASS.collect_arg_objs()
-        # Note that the service is likely to include auth args of its own.
+        BaseCommand.__init__(self, **kwargs)
+
+    def _post_init(self):
+        if self.service is None:
+            self.service = self.SERVICE_CLASS(self.config, self.log)
+        BaseCommand._post_init(self)
+
+    @property
+    def default_route(self):
+        return self.params
+
+    def collect_arg_objs(self):
+        request_args = BaseCommand.collect_arg_objs(self)
+        service_args = self.service.collect_arg_objs()
+        # Note that the service is likely to include auth args as well.
         return request_args + service_args
 
-    def populate_parser(self, parser, arg_objs):
-        # Does not have access to self.config
-        args = BaseCommand.populate_parser(self, parser, arg_objs)
-        if self.FILTERS:
-            args.append(parser.add_argument('--filter', metavar='NAME=VALUE',
-                        action='append', dest='filters',
-                        help='restrict results to those that meet criteria',
-                        type=partial(_parse_filter, filter_objs=self.FILTERS)))
-            parser.epilog = self.__build_filter_help()
-            self._arg_routes.setdefault(None, [])
-            self._arg_routes[None].append('filters')
-        ## TODO:  service args
-        return args
+    def preprocess_arg_objs(self, arg_objs):
+        self.service.preprocess_arg_objs(arg_objs)
 
-    def _process_cli_args(self):
-        # Does not have access to self.config
-        BaseCommand._process_cli_args(self)
+    def populate_parser(self, parser, arg_objs):
+        BaseCommand.populate_parser(self, parser, arg_objs)
+        if self.FILTERS:
+            parser.add_argument('--filter', metavar='NAME=VALUE',
+                    action='append', dest='filters',
+                    help='restrict results to those that meet criteria',
+                    type=partial(_parse_filter, filter_objs=self.FILTERS))
+            parser.epilog = self.__build_filter_help()
+            self._arg_routes['filters'] = None
+
+    def process_cli_args(self):
+        BaseCommand.process_cli_args(self)
         if 'filters' in self.args:
             self.args['Filter'] = _process_filters(self.args.pop('filters'))
-            self._arg_routes.setdefault(self.DEFAULT_ROUTE, [])
-            self._arg_routes[self.DEFAULT_ROUTE].append('Filter')
+            self._arg_routes['Filter'] = self.params
+
+    def configure(self):
+        self.service.configure()
 
     @property
     def name(self):
@@ -129,7 +136,7 @@ class BaseRequest(BaseCommand):
         The name of this action.  Used when choosing what to supply for the
         Action query parameter.
         '''
-        return self.ACTION or self.__class__.__name__
+        return self.NAME or self.__class__.__name__
 
     @property
     def user_agent(self):
@@ -145,29 +152,13 @@ class BaseRequest(BaseCommand):
         return self.__user_agent
 
     @property
-    def service(self):
-        if self._service is None:
-            service_args = {'auth_args':    {},
-                            'session_args': {}}
-            for (key, val) in self.args.iteritems():
-                if key in self._arg_routes.get(SERVICE, []):
-                    service_args[key] = val
-                elif key in self._arg_routes.get(AUTH, []):
-                    service_args['auth_args'][key] = val
-                elif key in self._arg_routes.get(SESSION, []):
-                    service_args['session_args'][key] = val
-            self._service = self.SERVICE_CLASS(self.config, self.log,
-                                               **service_args)
-        return self._service
-
-    @property
     def status(self):
         if self.response is not None:
             return self.response.status
         else:
             return None
 
-    def serialize_params(self, args, route, prefix=None):
+    def serialize_params(self, args, prefix=None):
         '''
         Given a possibly-nested dict of args and an arg routing destination,
         transform each element in the dict that matches the corresponding
@@ -207,14 +198,13 @@ class BaseRequest(BaseCommand):
         elif isinstance(args, dict):
             for (key, val) in args.iteritems():
                 # Prefix.Key1, Prefix.Key2, ...
-                if key in self._arg_routes.get(route, []) or route is _ALWAYS:
                     if prefix:
                         prefixed_key = prefix + '.' + str(key)
                     else:
                         prefixed_key = str(key)
 
                     if isinstance(val, dict) or isinstance(val, list):
-                        flattened.update(self.serialize_params(val, _ALWAYS,
+                        flattened.update(self.serialize_params(val,
                                                                prefixed_key))
                     elif isinstance(val, file):
                         flattened[prefixed_key] = val.read()
@@ -231,8 +221,7 @@ class BaseRequest(BaseCommand):
                     prefixed_key = str(i_item)
 
                 if isinstance(item, dict) or isinstance(item, list):
-                    flattened.update(self.serialize_params(item, _ALWAYS,
-                                                           prefixed_key))
+                    flattened.update(self.serialize_params(item, prefixed_key))
                 elif isinstance(item, file):
                     flattened[prefixed_key] = item.read()
                 elif item or item == 0:
@@ -259,8 +248,7 @@ class BaseRequest(BaseCommand):
          4. If the response's status code does not indicate success, log an
             error and raise a ServerError.
         '''
-        params =      self.serialize_params(self.args,   PARAMS)
-        params.update(self.serialize_params(self.params, _ALWAYS))
+        params = self.serialize_params(self.params)
         headers = dict(self.headers or {})
         headers.setdefault('User-Agent', self.user_agent)
         self.log.info('parameters: %s', params)
@@ -470,6 +458,3 @@ class _ReadLoggingFileWrapper(object):
         chunk = self.fileobj.read(size)
         self.logger.log(self.level, chunk, extra={'append': True})
         return chunk
-
-
-_ALWAYS = type('_ALWAYS', (), {'__repr__': lambda self: '_ALWAYS'})()

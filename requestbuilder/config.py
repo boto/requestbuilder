@@ -1,4 +1,4 @@
-# Copyright (c) 2012, Eucalyptus Systems, Inc.
+# Copyright (c) 2012-2013, Eucalyptus Systems, Inc.
 #
 # Permission to use, copy, modify, and/or distribute this software for
 # any purpose with or without fee is hereby granted, provided that the
@@ -21,9 +21,11 @@ class Config(object):
             self.log = log.getChild('config')
         else:
             self.log = _FakeLogger()
+        self.globals = {}
         self.regions = {}
         self.users   = {}
-        self.globals = {}
+        self.__current_region = None
+        self.__current_user   = None
         self._memo   = {}
         self._parse_config(filenames)
 
@@ -58,6 +60,45 @@ class Config(object):
                 self.users[user] = dict(parser.items(section))
             # Ignore unrecognized sections for forward compatibility
 
+    @property
+    def current_region(self):
+        # This is a property so we can log when it is set.
+        return self.__current_region
+
+    @current_region.setter
+    def current_region(self, val):
+        self.log.debug('current region set to %s', repr(val))
+        self.__current_region = val
+
+    def get_region(self):
+        if self.current_region is not None:
+            return self.current_region
+        if 'default-region' in self.globals:
+            return self.globals['default-region']
+        raise KeyError('no region was chosen')
+
+    @property
+    def current_user(self):
+        # This is a property so we can log when it is set.
+        return self.__current_user
+
+    @current_user.setter
+    def current_user(self, val):
+        self.log.debug('current user set to %s', repr(val))
+        self.__current_user = val
+
+    def get_user(self):
+        if self.current_user is not None:
+            return self.current_user
+        if self.get_region() is not None:
+            # Try to pull it from the current region
+            region_user = self.get_region_option('user')
+            if region_user is not None:
+                return region_user
+        if 'default-user' in self.globals:
+            return self.globals['default-user']
+        raise KeyError('no user was chosen')
+
     def get_global_option(self, option):
         return self.globals.get(option)
 
@@ -65,51 +106,29 @@ class Config(object):
         value = self.get_global_option(option)
         return convert_to_bool(value, default=default)
 
-    def get_user_option(self, regionspec, option):
-        user   = None
-        region = None
-        if regionspec:
-            if '@' in regionspec:
-                user, region = regionspec.split('@', 1)
-            else:
-                region = regionspec
-        if not region:
-            region = self.globals.get('default-region')
-        if not user and region:
-            user = self._lookup_recursively(self.regions, region,
-                                            'default-user')
-        if not user and self.globals.get('default-user'):
-            user = self.globals['default-user']
-        if not user:
-            self.log.debug('no user to find')
-            return None
-        return self._lookup_recursively(self.users, user, option,
-                                        redact=['secret-key'])
+    def get_user_option(self, option, user=None, redact=False):
+        if user is None:
+            user = self.get_user()
+        return self._lookup_recursively('users', self.users, user, option,
+                                        redact=redact)
 
-    def get_user_option_bool(self, regionspec, option, default=None):
-        value = self.get_user_option(regionspec, option)
+    def get_user_option_bool(self, option, user=None, default=None):
+        value = self.get_user_option(option, user=user)
         return convert_to_bool(value, default=default)
 
-    def get_region_option(self, regionspec, option):
-        if regionspec:
-            if '@' in regionspec:
-                region = regionspec.split('@', 1)[1]
-            else:
-                region = regionspec
-        elif self.globals.get('default-region'):
-            region = self.globals['default-region']
-        else:
-            self.log.debug('no region to find')
-            return None
-        return self._lookup_recursively(self.regions, region, option)
+    def get_region_option(self, option, region=None, redact=False):
+        if region is None:
+            region = self.get_region()
+        return self._lookup_recursively('regions', self.regions, region,
+                                        option, redact=redact)
 
-    def get_region_option_bool(self, regionspec, option, default=None):
-        value = self.get_region_option(regionspec, option)
+    def get_region_option_bool(self, option, region=None, default=None):
+        value = self.get_region_option(option, region=region)
         return convert_to_bool(value, default=default)
 
-    def _lookup_recursively(self, confdict, section, option, redact=None,
-                            cont_reason=None):
-        ## TODO:  detect loops
+    def _lookup_recursively(self, confdict_name, confdict, section, option,
+                            redact=None, cont_reason=None):
+        # TODO:  detect loops
         self._memo.setdefault(id(confdict), {})
         if (section, option) in self._memo[id(confdict)]:
             return self._memo[id(confdict)][(section, option)]
@@ -119,7 +138,8 @@ class Config(object):
 
         section_bits = section.split(':')
         if not cont_reason:
-            self.log.debug('searching for option %s', repr(option))
+            self.log.debug('searching %s for option %s', confdict_name,
+                           repr(option))
         for prd in itertools.product((True, False), repeat=len(section_bits)):
             prd_section = ':'.join(section_bits[i] if prd[i] else '*'
                                    for i in range(len(section_bits)))
@@ -143,11 +163,11 @@ class Config(object):
                             new_option = value_chunks[2]
                         else:
                             new_option = option
-                        return memoize(self._lookup_recursively(
+                        return memoize(self._lookup_recursively(confdict_name,
                                 confdict, new_section, new_option,
                                 cont_reason='deferred'))
                     # We're done!
-                    if redact and option in redact:
+                    if redact:
                         print_value = '<redacted>'
                     else:
                         print_value = repr(value)
@@ -166,7 +186,7 @@ class Config(object):
             if count > len(section_bits):
                 matches = c_counts[count]
                 if len(matches) == 1:
-                    return memoize(self._lookup_recursively(
+                    return memoize(self._lookup_recursively(confdict_name,
                             confdict, matches[0], option,
                             cont_reason=('from ' + repr(section))))
                 elif len(matches) > 1:

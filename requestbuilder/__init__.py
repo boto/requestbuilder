@@ -1,4 +1,4 @@
-# Copyright (c) 2012, Eucalyptus Systems, Inc.
+# Copyright (c) 2012-2013, Eucalyptus Systems, Inc.
 #
 # Permission to use, copy, modify, and/or distribute this software for
 # any purpose with or without fee is hereby granted, provided that the
@@ -13,6 +13,7 @@
 # OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 import argparse
+import operator
 
 __version__ = '0.0'
 
@@ -111,19 +112,13 @@ class GenericTagFilter(Filter):
 
 
 ########## SINGLETONS ##########
-# Indicates a parameter that should be sent to the server without a value
+# Indicates a parameter that should be sent to the server without a value.
+# Contrast this with empty strings, with are omitted from requests entirely.
 EMPTY = type('EMPTY', (), {'__repr__': lambda self: "''",
                            '__str__':  lambda self: ''})()
 
-# Constants (enums?) used for arg routing
-AUTH    = type('AUTH',    (), {'__repr__': lambda self: 'AUTH'})()
-PARAMS  = type('PARAMS',  (), {'__repr__': lambda self: 'PARAMS'})()
-SERVICE = type('SERVICE', (), {'__repr__': lambda self: 'SERVICE'})()
-SESSION = type('SESSION', (), {'__repr__': lambda self: 'SESSION'})()
-
-# Common args for query authentication
-STD_AUTH_ARGS = [
-        Arg('-I', '--access-key-id', dest='key_id', metavar='KEY_ID',
-            route_to=AUTH),
-        Arg('-S', '--secret-key', dest='secret_key', metavar='KEY',
-            route_to=AUTH)]
+# Getters used for arg routing
+AUTH    = operator.attrgetter('service.auth.args')
+PARAMS  = operator.attrgetter('params')
+SERVICE = operator.attrgetter('service.args')
+SESSION = operator.attrgetter('service.session_args')

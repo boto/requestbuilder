@@ -19,116 +19,113 @@ import requests.exceptions
 import time
 import urlparse
 
-from .auth import QuerySignatureV2Auth
+from .auth import QuerySigV2Auth
 from .exceptions import ClientError, ServiceInitError
+from .util import aggregate_subclass_fields
 
 class BaseService(object):
     NAME        = ''
     DESCRIPTION = ''
     API_VERSION = ''
-    MAX_RETRIES = 4
+    MAX_RETRIES = 4  ## TODO:  check the config file
 
-    AUTH_CLASS = QuerySignatureV2Auth
-    ENV_URL    = 'AWS_URL'  # endpoint URL
+    AUTH_CLASS = None
+    ENV_URL    = None
 
-    def __init__(self, config, log, url=None, regionspec=None, auth_args=None,
-                 session_args=None):
-        self.log = log
-        # The region name currently only matters for sigv4.
-        ## FIXME:  It also won't work with every config source yet.
-        ## TODO:  DOCUMENT:  if url contains :: it will be split into
-        ##                   regionspec::endpoint
-        ## FIXME:  Is the above info true any more?
-        self.config        = config
-        self.endpoint_url  = None
-        self.regionspec    = regionspec  ## TODO:  rename this
-        self._auth_args    = auth_args    or {}
-        self._session_args = session_args or {}
+    ARGS = []
 
-        # SSL verification is opt-in
-        self._session_args.setdefault('verify', False)
+    def __init__(self, config, log, **kwargs):
+        self.args     = kwargs
+        self.config   = config
+        self.endpoint = None
+        self.log      = log
+        self.session_args = {'verify': False}  # SSL verification is opt-in
+        self._session = None
 
-        # Set self.endpoint_url and self.regionspec from __init__ args
-        self._set_url_vars(url)
+        if self.AUTH_CLASS is not None:
+            self.auth = self.AUTH_CLASS(self)
+        else:
+            self.auth = None
 
-        # Grab info from the command line or service-specific config
-        self.read_config()
+    @property
+    def region_name(self):
+        return self.config.get_region()
 
-        if not self.endpoint_url:
+    def collect_arg_objs(self):
+        service_args = aggregate_subclass_fields(self.__class__, 'ARGS')
+        if self.auth is not None:
+            auth_args = self.auth.collect_arg_objs()
+        else:
+            auth_args = []
+        return service_args + auth_args
+
+    def preprocess_arg_objs(self, arg_objs):
+        if self.auth is not None:
+            self.auth.preprocess_arg_objs(arg_objs)
+
+    def configure(self):
+        # self.args gets highest precedence for self.endpoint and user/region
+        self.process_url(self.args.get('url'))
+        if self.args.get('userregion'):
+            self.process_userregion(self.args['userregion'])
+        # Environment comes next
+        self.process_url(os.getenv(self.ENV_URL))
+        # Finally, try the config file
+        self.process_url(self.config.get_region_option(self.NAME + '-url'))
+
+        # Ensure everything is okay and finish up
+        self.validate_config()
+        if self.auth is not None:
+            self.auth.configure()
+
+    @property
+    def session(self):
+        if self._session is not None:
+            return self._session
+        if requests.__version__ >= '1.0':
+            self._session = requests.session()
+            self._session.auth = self.auth
+            for key, val in self.session_args.iteritems():
+                setattr(self._session, key, val)
+        else:
+            self._session = requests.session(auth=self.auth,
+                                             **self.session_args)
+        return self._session
+
+    def validate_config(self):
+        if self.endpoint is None:
             regions = ', '.join(sorted(self.config.regions.keys()))
             errmsg = 'no endpoint to connect to was given'
             if regions:
-                errmsg += '.  Known regions are '
-                errmsg += ', '.join(sorted(self.config.regions.keys()))
+                errmsg += '.  Known regions are ' + regions
             raise ServiceInitError(errmsg)
 
-        auth = self.AUTH_CLASS(self, **self._auth_args)
-        self.session = requests.session(auth=auth, **self._session_args)
+    def process_url(self, url):
+        if url:
+            if '::' in url:
+                userregion, endpoint = url.split('::', 1)
+            else:
+                endpoint   = url
+                userregion = None
+            if self.endpoint is None:
+                self.endpoint = url
+            if userregion:
+                self.process_userregion(userregion)
 
-    @classmethod
-    def collect_arg_objs(cls):
-        ## TODO:  implement this
-        return []
+    def process_userregion(self, userregion):
+        if '@' in userregion:
+            user, region = userregion.split('@', 1)
+        else:
+            user   = None
+            region = userregion
+        if region and self.config.current_region is None:
+            self.config.current_region = region
+        if user and self.config.current_user is None:
+            self.config.current_user = user
 
-    def read_config(self):
-        '''
-        Read configuration from the environment, files, and so on and use them
-        to populate self.endpoint_url, self.regionspec, and self._auth_args.
-
-        This method's configuration sources are, in order:
-          - An environment variable with the same name as self.ENV_URL
-          - An AWS credential file, from the path given in the
-            AWS_CREDENTIAL_FILE environment variable
-          - Requestbuilder configuration files, from paths given in
-            self.CONFIG_FILES
-
-        Of these, earlier sources take precedence over later sources.
-
-        Subclasses may override this method to add or rearrange configuration
-        sources.
-        '''
-        # Try the environment first
-        if self.ENV_URL in os.environ:
-            self._set_url_vars(os.getenv(self.ENV_URL, None))
-        # Read config files from their default locations
-        self.read_aws_credential_file()
-        self.read_requestbuilder_config()
-
-    def read_requestbuilder_config(self):
-        self._set_url_vars(self.config.get_region_option(self.regionspec,
-                                                         self.NAME + '-url'))
-        secret_key = self.config.get_user_option(self.regionspec, 'secret-key')
-        if secret_key and not self._auth_args.get('secret_key'):
-            self._auth_args['secret_key'] = secret_key
-        key_id = self.config.get_user_option(self.regionspec, 'key-id')
-        if key_id and not self._auth_args.get('key_id'):
-            self._auth_args['key_id'] = key_id
-
-        if self.config.get_region_option_bool(self.regionspec, 'verify-ssl'):
-            self._session_args['verify'] = True
-
-    def read_aws_credential_file(self):
-        '''
-        If the 'AWS_CREDENTIAL_FILE' environment variable exists, parse that
-        file for access keys and use them if keys were not already supplied to
-        __init__.
-        '''
-        if 'AWS_CREDENTIAL_FILE' in os.environ:
-            path = os.getenv('AWS_CREDENTIAL_FILE')
-            path = os.path.expandvars(path)
-            path = os.path.expanduser(path)
-            with open(path) as credfile:
-                for line in credfile:
-                    line = line.split('#', 1)[0]
-                    if '=' in line:
-                        (key, val) = line.split('=', 1)
-                        if (key.strip() == 'AWSAccessKeyId' and
-                            not self._auth_args.get('key_id')):
-                            self._auth_args['key_id'] = val.strip()
-                        elif (key.strip() == 'AWSSecretKey' and
-                              not self._auth_args.get('secret_key')):
-                            self._auth_args['secret_key'] = val.strip()
-
+    ## TODO:  nuke Action; the request should make it a param instead
+    ## TODO:  the same should probably happen with API versions, but the
+    ##        request would have to deal with service.API_VERSION, too
     def make_request(self, action, method='GET', path=None, params=None,
                      headers=None, data=None, api_version=None):
         params = params or {}
@@ -143,12 +140,12 @@ class BaseService(object):
         if path:
             # We can't simply use urljoin because a path might start with '/'
             # like it could for S3 keys that start with that character.
-            if self.endpoint_url.endswith('/'):
-                url = self.endpoint_url + path
+            if self.endpoint.endswith('/'):
+                url = self.endpoint + path
             else:
-                url = self.endpoint_url + '/' + path
+                url = self.endpoint + '/' + path
         else:
-            url = self.endpoint_url
+            url = self.endpoint
 
         ## TODO:  replace pre_send and post_request hooks for use with requests 1
         hooks = {'pre_send':     _log_request_data(self.log),
@@ -165,15 +162,6 @@ class BaseService(object):
         except requests.exceptions.RequestException as exc:
             raise ClientError(exc)
 
-    def _set_url_vars(self, url):
-        if url:
-            if '::' in url:
-                regionspec, endpoint_url = url.split('::', 1)
-            else:
-                regionspec   = None
-                endpoint_url = url
-            self.regionspec   = regionspec   or self.regionspec
-            self.endpoint_url = endpoint_url or self.endpoint_url
 
 class RetryOnStatuses(object):
     def __init__(self, statuses, max_retries, logger=None):
