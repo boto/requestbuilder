@@ -252,7 +252,7 @@ class BaseRequest(BaseCommand):
         headers = dict(self.headers or {})
         headers.setdefault('User-Agent', self.user_agent)
         self.log.info('parameters: %s', params)
-        self.response = self.service.make_request(self.name,
+        self.response = self.service.send_request(self.name,
                 method=self.method, headers=headers, params=params,
                 data=self.post_data, api_version=self.API_VERSION)
         try:

@@ -127,7 +127,7 @@ class BaseService(object):
     ## TODO:  nuke Action; the request should make it a param instead
     ## TODO:  the same should probably happen with API versions, but the
     ##        request would have to deal with service.API_VERSION, too
-    def make_request(self, action, method='GET', path=None, params=None,
+    def send_request(self, action, method='GET', path=None, params=None,
                      headers=None, data=None, api_version=None):
         params = params or {}
         if action:
