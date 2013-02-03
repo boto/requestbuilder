@@ -261,8 +261,9 @@ class BaseRequest(BaseCommand):
                 self.log.info('result: success')
                 return parsed
             else:
-                self.log.debug('-- response content --\n%s',
-                               self.response.text)
+                self.log.debug('-- response content --\n',
+                               extra={'append': True})
+                self.log.debug(self.response.text, extra={'append': True})
                 self.log.debug('-- end of response content --')
                 self.log.info('result: failure')
                 raise ServerError(self.response.status_code,
