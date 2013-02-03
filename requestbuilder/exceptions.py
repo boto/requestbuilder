@@ -14,6 +14,8 @@
 
 
 import io
+import six
+
 try:
     from xml.etree import cElementTree as ElementTree
 except ImportError:
@@ -50,18 +52,23 @@ class ServerError(RuntimeError):
     def __init__(self, status, body=None, *args):
         RuntimeError.__init__(self, *args)
         self.status_code = status  # HTTP status code
-        self.body        = body or ''
+        self.body        = body or u''
         self.code        = None    # API error code
         self.message     = None    # Error message
 
         if self.body:
             try:
-                xml_stream = io.StringIO(self.body)
+                xml_stream = io.StringIO(six.text_type(self.body))
                 for event, elem in ElementTree.iterparse(xml_stream,
                                                          events=('end',)):
-                    if elem.tag == 'Code':
+                    # Strip the namespace, if any, off the tag
+                    if elem.tag.startswith('{'):
+                        bare_tag = elem.tag.split('}', 1)[1]
+                    else:
+                        bare_tag = elem.tag
+                    if bare_tag == u'Code':
                         self.code = elem.text
-                    elif elem.tag == 'Message':
+                    elif bare_tag == u'Message':
                         self.message = elem.text
             except ElementTree.ParseError as err:
                 # Dump the unparseable message body so we don't include
