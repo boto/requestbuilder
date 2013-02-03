@@ -50,9 +50,6 @@ class BaseRequest(BaseCommand):
 
     Important members of this class include:
      - SERVICE_CLASS: a class corresponding to the web service in use
-     - API_VERSION:   the API version to send along with the request.  This is
-                      only necessary to override the service class's API
-                      version for a specific request.
      - NAME:          a string containing the Action query parameter.  This
                       defaults to the class's name.
      - DESCRIPTION:   a string describing the tool.  This becomes part of the
@@ -69,7 +66,6 @@ class BaseRequest(BaseCommand):
     '''
 
     SERVICE_CLASS = BaseService
-    API_VERSION   = None
     NAME          = None
 
     FILTERS = []
@@ -79,12 +75,10 @@ class BaseRequest(BaseCommand):
     def __init__(self, service=None, **kwargs):
         self.service = service
         # Parts of the HTTP request to be sent to the server.
-        # Note that self.serialize_params will update self.params for each
-        # entry in self.args that routes to PARAMS.
+        self.method    = 'GET'
         self.headers   = {}
         self.params    = {}
-        self.post_data = None
-        self.method    = 'GET'
+        self.body      = None
 
         # HTTP response obtained from the server
         self.response = None
@@ -110,22 +104,6 @@ class BaseRequest(BaseCommand):
 
     def preprocess_arg_objs(self, arg_objs):
         self.service.preprocess_arg_objs(arg_objs)
-
-    def populate_parser(self, parser, arg_objs):
-        BaseCommand.populate_parser(self, parser, arg_objs)
-        if self.FILTERS:
-            parser.add_argument('--filter', metavar='NAME=VALUE',
-                    action='append', dest='filters',
-                    help='restrict results to those that meet criteria',
-                    type=partial(_parse_filter, filter_objs=self.FILTERS))
-            parser.epilog = self.__build_filter_help()
-            self._arg_routes['filters'] = None
-
-    def process_cli_args(self):
-        BaseCommand.process_cli_args(self)
-        if 'filters' in self.args:
-            self.args['Filter'] = _process_filters(self.args.pop('filters'))
-            self._arg_routes['Filter'] = self.params
 
     def configure(self):
         self.service.configure()
@@ -158,7 +136,119 @@ class BaseRequest(BaseCommand):
         else:
             return None
 
-    def serialize_params(self, args, prefix=None):
+    def send(self):
+        headers = dict(self.headers or {})
+        headers.setdefault('User-Agent', self.user_agent)
+        params  = self.prepare_params()
+        self.response = self.service.send_request(method=self.method,
+                headers=headers, params=params, data=self.body)
+        try:
+            if 200 <= self.response.status_code < 300:
+                parsed = self.parse_response(self.response)
+                self.log.info('result: success')
+                return parsed
+            else:
+                self.log.debug('-- response content --\n',
+                               extra={'append': True})
+                self.log.debug(self.response.text, extra={'append': True})
+                self.log.debug('-- end of response content --')
+                self.log.info('result: failure')
+                raise ServerError(self.response.status_code,
+                                  self.response.content)
+        finally:
+            # Empty the socket buffer so it can be reused
+            try:
+                self.response.content
+            except RuntimeError:
+                # The content was already consumed
+                pass
+
+    def prepare_params(self):
+        return self.params or {}
+
+    def parse_response(self, response):
+        return response
+
+    def main(self):
+        '''
+        The main processing method for this type of request.  In this method,
+        inheriting classes generally populate self.headers, self.params, and
+        self.body with information gathered from self.args or elsewhere,
+        call self.send, and return the response.  BaseRequest's default
+        behavior is to simply return the result of a request with everything
+        that routes to PARAMS.
+        '''
+        self.preprocess()
+        response = self.send()
+        self.postprocess(response)
+        return response
+
+    def preprocess(self):
+        pass
+
+    def postprocess(self, response):
+        pass
+
+    def handle_cli_exception(self, err):
+        if isinstance(err, ServerError):
+            if err.code:
+                print >> sys.stderr, 'error ({code}) {msg}'.format(
+                        code=err.code, msg=err.message or '')
+            else:
+                print >> sys.stderr, 'error {msg}'.format(
+                        msg=err.message or '')
+            if self.debug:
+                raise
+            sys.exit(1)
+        else:
+            BaseCommand.handle_cli_exception(self, err)
+
+
+class AWSQueryRequest(BaseRequest):
+    API_VERSION = None
+
+    def populate_parser(self, parser, arg_objs):
+        BaseRequest.populate_parser(self, parser, arg_objs)
+        if self.FILTERS:
+            parser.add_argument('--filter', metavar='NAME=VALUE',
+                    action='append', dest='filters',
+                    help='restrict results to those that meet criteria',
+                    type=partial(_parse_filter, filter_objs=self.FILTERS))
+            parser.epilog = self.__build_filter_help()
+            self._arg_routes['filters'] = None
+
+    def process_cli_args(self):
+        BaseRequest.process_cli_args(self)
+        if 'filters' in self.args:
+            self.args['Filter'] = _process_filters(self.args.pop('filters'))
+            self._arg_routes['Filter'] = self.params
+
+    def prepare_params(self):
+        params = self.flatten_params(self.params)
+        params['Action'] = self.name
+        params['Version'] = self.API_VERSION or self.service.API_VERSION
+        self.log.info('parameters: %s', params)
+        return params
+
+    def parse_response(self, response):
+        # Parser for list-delimited responses like EC2's
+
+        # We do some extra handling here to log stuff as it comes in rather
+        # than reading it all into memory at once.
+        self.log.debug('-- response content --\n', extra={'append': True})
+        # Using Response.iter_content gives us automatic decoding, but we then
+        # have to make the generator look like a file so etree can use it.
+        with _IteratorFileObjAdapter(self.response.iter_content(16384)) \
+                as content_fileobj:
+            logged_fileobj = _ReadLoggingFileWrapper(content_fileobj, self.log,
+                                                     logging.DEBUG)
+            response_dict = parse_listdelimited_aws_xml(logged_fileobj,
+                                                        self.LIST_MARKERS)
+        self.log.debug('-- end of response content --')
+        # Strip off the root element
+        return response_dict[list(response_dict.keys())[0]]
+
+    def flatten_params(self, args, prefix=None):
         '''
         Given a possibly-nested dict of args and an arg routing destination,
         transform each element in the dict that matches the corresponding
@@ -204,8 +294,7 @@ class BaseRequest(BaseCommand):
                         prefixed_key = str(key)
 
                     if isinstance(val, dict) or isinstance(val, list):
-                        flattened.update(self.serialize_params(val,
-                                                               prefixed_key))
+                        flattened.update(self.flatten_params(val, prefixed_key))
                     elif isinstance(val, file):
                         flattened[prefixed_key] = val.read()
                     elif val or val is 0:
@@ -221,7 +310,7 @@ class BaseRequest(BaseCommand):
                     prefixed_key = str(i_item)
 
                 if isinstance(item, dict) or isinstance(item, list):
-                    flattened.update(self.serialize_params(item, prefixed_key))
+                    flattened.update(self.flatten_params(item, prefixed_key))
                 elif isinstance(item, file):
                     flattened[prefixed_key] = item.read()
                 elif item or item == 0:
@@ -231,102 +320,6 @@ class BaseRequest(BaseCommand):
         else:
             raise TypeError('non-flattenable type: ' + args.__class__.__name__)
         return flattened
-
-    def send(self):
-        '''
-        Send a request to the server and return its response.  More precisely:
-
-         1. Build a dict of params suitable for submission as HTTP request
-            parameters, based first upon the content of self.params, and
-            second upon everything in self.args that routes to PARAMS.
-         2. Send an HTTP request via self.service with the HTTP method given
-            in self.method using query parameters from the aforementioned
-            serialized dict, headers based on self.headers, and POST data based
-            on self.post_data.
-         3. If the response's status code indicates success, parse the
-            response with self.parse_response and return the result.
-         4. If the response's status code does not indicate success, log an
-            error and raise a ServerError.
-        '''
-        params = self.serialize_params(self.params)
-        headers = dict(self.headers or {})
-        headers.setdefault('User-Agent', self.user_agent)
-        self.log.info('parameters: %s', params)
-        self.response = self.service.send_request(self.name,
-                method=self.method, headers=headers, params=params,
-                data=self.post_data, api_version=self.API_VERSION)
-        try:
-            if 200 <= self.response.status_code < 300:
-                parsed = self.parse_response(self.response)
-                self.log.info('result: success')
-                return parsed
-            else:
-                self.log.debug('-- response content --\n',
-                               extra={'append': True})
-                self.log.debug(self.response.text, extra={'append': True})
-                self.log.debug('-- end of response content --')
-                self.log.info('result: failure')
-                raise ServerError(self.response.status_code,
-                                  self.response.content)
-        finally:
-            # Empty the socket buffer so it can be reused
-            try:
-                self.response.content
-            except RuntimeError:
-                # The content was already consumed
-                pass
-
-    def parse_response(self, response):
-        # Parser for list-delimited responses like EC2's
-
-        # We do some extra handling here to log stuff as it comes in rather
-        # than reading it all into memory at once.
-        self.log.debug('-- response content --\n', extra={'append': True})
-        # Using Response.iter_content gives us automatic decoding, but we then
-        # have to make the generator look like a file so etree can use it.
-        with _IteratorFileObjAdapter(self.response.iter_content(16384)) \
-                as content_fileobj:
-            logged_fileobj = _ReadLoggingFileWrapper(content_fileobj, self.log,
-                                                     logging.DEBUG)
-            response_dict = parse_listdelimited_aws_xml(logged_fileobj,
-                                                        self.LIST_MARKERS)
-        self.log.debug('-- end of response content --')
-        # Strip off the root element
-        return response_dict[list(response_dict.keys())[0]]
-
-    def main(self):
-        '''
-        The main processing method for this type of request.  In this method,
-        inheriting classes generally populate self.headers, self.params, and
-        self.post_data with information gathered from self.args or elsewhere,
-        call self.send, and return the response.  BaseRequest's default
-        behavior is to simply return the result of a request with everything
-        that routes to PARAMS.
-        '''
-        self.preprocess()
-        response = self.send()
-        self.postprocess(response)
-        return response
-
-    def preprocess(self):
-        pass
-
-    def postprocess(self, response):
-        pass
-
-    def handle_cli_exception(self, err):
-        if isinstance(err, ServerError):
-            if err.code:
-                print >> sys.stderr, 'error ({code}) {msg}'.format(
-                        code=err.code, msg=err.message or '')
-            else:
-                print >> sys.stderr, 'error {msg}'.format(
-                        msg=err.message or '')
-            if self.debug:
-                raise
-            sys.exit(1)
-        else:
-            BaseCommand.handle_cli_exception(self, err)
 
     def __build_filter_help(self, force=False):
         '''

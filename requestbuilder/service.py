@@ -19,7 +19,6 @@ import requests.exceptions
 import time
 import urlparse
 
-from .auth import QuerySigV2Auth
 from .exceptions import ClientError, ServiceInitError
 from .util import aggregate_subclass_fields
 
@@ -124,19 +123,8 @@ class BaseService(object):
         if user and self.config.current_user is None:
             self.config.current_user = user
 
-    ## TODO:  nuke Action; the request should make it a param instead
-    ## TODO:  the same should probably happen with API versions, but the
-    ##        request would have to deal with service.API_VERSION, too
-    def send_request(self, action, method='GET', path=None, params=None,
-                     headers=None, data=None, api_version=None):
-        params = params or {}
-        if action:
-            params['Action'] = action
-        if api_version:
-            params['Version'] = api_version
-        elif self.API_VERSION:
-            params['Version'] = self.API_VERSION
-
+    def send_request(self, method='GET', path=None, params=None, headers=None,
+                     data=None):
         ## TODO:  test url-encoding
         if path:
             # We can't simply use urljoin because a path might start with '/'
