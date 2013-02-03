@@ -95,6 +95,7 @@ class BaseCommand(object):
         if self.__do_cli:
             # Distribute CLI args to the various places that need them
             self.process_cli_args()
+        self.distribute_args()
         self.configure()
 
     @property
@@ -151,28 +152,6 @@ class BaseCommand(object):
         for arg_obj in arg_objs:
             self.__add_arg_to_cli_parser(arg_obj, parser)
 
-    def process_cli_args(self):
-        '''
-        Process CLI args to fill in missing parts of self.args and enable
-        debugging if necessary.
-        '''
-
-        cli_args = self._cli_parser.parse_args()
-        for key, val in vars(cli_args).iteritems():
-            # Everything goes in self.args
-            self.args[key] = val
-
-            # If a location to route this to was supplied, put it there, too.
-            route = self._arg_routes[key]
-            if route is not None:
-                if callable(route):
-                    # If it's callable, call it to get the actual destination
-                    # dict.  This is needed to allow Arg objects to refer to
-                    # instance attributes from the context of the class.
-                    route = route(self)
-                # At this point we had better have a dict.
-                route[key] = val
-
     def __add_arg_to_cli_parser(self, arglike_obj, parser):
         # Returns the args the parser was populated with
         if isinstance(arglike_obj, Arg):
@@ -195,6 +174,25 @@ class BaseCommand(object):
         else:
             raise TypeError('Unknown argument type ' +
                             arglike_obj.__class__.__name__)
+
+    def process_cli_args(self):
+        cli_args = self._cli_parser.parse_args()
+        # Everything goes in self.args.  distribute_args() also puts them
+        # elsewhere later on in the process.
+        self.args.update(vars(cli_args))
+
+    def distribute_args(self):
+        for key, val in self.args.iteritems():
+            # If a location to route this to was supplied, put it there, too.
+            route = self._arg_routes[key]
+            if route is not None:
+                if callable(route):
+                    # If it's callable, call it to get the actual destination
+                    # dict.  This is needed to allow Arg objects to refer to
+                    # instance attributes from the context of the class.
+                    route = route(self)
+                # At this point we had better have a dict.
+                route[key] = val
 
     def configure(self):
         # TODO:  Come up with something that can enforce arg constraints based
