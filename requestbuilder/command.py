@@ -66,8 +66,6 @@ class BaseCommand(object):
             Arg('--debugger', action='store_true', route_to=None,
                 help='enable interactive debugger on error')]
 
-    VERSION = 'requestbuilder ' + __version__
-
     def __init__(self, _do_cli=False, **kwargs):
         self.args          = kwargs
         self.config        = None  # created by _process_configfile
@@ -138,8 +136,8 @@ class BaseCommand(object):
         arg_objs = self.collect_arg_objs()
         self.preprocess_arg_objs(arg_objs)
         self.populate_parser(parser, arg_objs)
-        parser.add_argument('--version', action='version',
-                            version=self.VERSION)  # doesn't need routing
+        parser.add_argument('--version', action='store_true', dest='_version',
+                            default=argparse.SUPPRESS)
         self._cli_parser = parser
 
     def collect_arg_objs(self):
@@ -176,10 +174,12 @@ class BaseCommand(object):
                             arglike_obj.__class__.__name__)
 
     def process_cli_args(self):
-        cli_args = self._cli_parser.parse_args()
+        cli_args = vars(self._cli_parser.parse_args())
+        if cli_args.get('_version', False):
+            self.print_version_and_exit()
         # Everything goes in self.args.  distribute_args() also puts them
         # elsewhere later on in the process.
-        self.args.update(vars(cli_args))
+        self.args.update(cli_args)
 
     def distribute_args(self):
         for key, val in self.args.iteritems():
@@ -247,6 +247,11 @@ class BaseCommand(object):
         if self.debug:
             raise
         sys.exit(1)
+
+    @staticmethod
+    def print_version_and_exit():
+        print >> sys.stderr, 'requestbuilder {0} (Prelude)'.format(__version__)
+        sys.exit()
 
     def __config_enables_debugging(self):
         if self.config is None:

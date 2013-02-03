@@ -24,7 +24,7 @@ from . import __version__, EMPTY
 from .command import BaseCommand
 from .exceptions import ClientError, ServerError
 from .service import BaseService
-from .util import aggregate_subclass_fields
+from .util import aggregate_subclass_fields, get_default_user_agent
 from .xmlparse import parse_listdelimited_aws_xml
 
 class BaseRequest(BaseCommand):
@@ -122,11 +122,7 @@ class BaseRequest(BaseCommand):
         Return a user-agent string for this program.
         '''
         if not self.__user_agent:
-            template = 'requestbuilder/{ver} ({os} {osver}; {python} {pyver})'
-            self.__user_agent = template.format(ver=__version__,
-                    os=platform.uname()[0], osver=platform.uname()[2],
-                    python=platform.python_implementation(),
-                    pyver=platform.python_version())
+            self.__user_agent = get_default_user_agent()
         return self.__user_agent
 
     @property
