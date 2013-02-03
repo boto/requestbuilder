@@ -18,7 +18,7 @@ import hashlib
 import hmac
 import os
 import requests.auth
-from six import text_type
+import six
 import time
 import urllib
 import urlparse
@@ -113,7 +113,7 @@ class QuerySigV2Auth(HmacKeyAuth):
                 host=parsed.netloc.lower(), path=(parsed.path or '/'))
         quoted_params = []
         for key in sorted(req.params):
-            val = text_type(req.params[key])
+            val = six.text_type(req.params[key])
             quoted_params.append(urllib.quote(key, safe='') + '=' +
                                  urllib.quote(val, safe='-_~'))
         query_string = '&'.join(quoted_params)
