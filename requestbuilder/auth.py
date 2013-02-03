@@ -53,9 +53,9 @@ class BaseAuth(requests.auth.AuthBase):
 
 class HmacKeyAuth(BaseAuth):
     ARGS = [Arg('-I', '--access-key-id', dest='key_id', metavar='KEY_ID',
-                default=argparse.SUPPRESS, route_to=AUTH),
+                route_to=AUTH),
             Arg('-S', '--secret-key', dest='secret_key', metavar='KEY',
-                default=argparse.SUPPRESS, route_to=AUTH)]
+                route_to=AUTH)]
 
     def configure(self):
         # See if an AWS credential file was given in the environment
@@ -84,13 +84,15 @@ class HmacKeyAuth(BaseAuth):
                             self.args.setdefault('secret_key', val.strip())
 
     def configure_from_configfile(self):
-        config_key_id = self.config.get_user_option('key-id')
-        if config_key_id:
-            self.args.setdefault('key_id', config_key_id)
-        config_secret_key = self.config.get_user_option('secret-key',
-                                                        redact=True)
-        if config_secret_key:
-            self.args.setdefault('secret_key', config_secret_key)
+        if not self.args.get('key_id'):
+            config_key_id = self.config.get_user_option('key-id')
+            if config_key_id:
+                self.args['key_id'] = config_key_id
+        if not self.args.get('secret_key'):
+            config_secret_key = self.config.get_user_option('secret-key',
+                                                            redact=True)
+            if config_secret_key:
+                self.args['secret_key'] = config_secret_key
 
 
 class QuerySigV2Auth(HmacKeyAuth):
