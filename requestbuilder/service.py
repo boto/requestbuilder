@@ -29,7 +29,7 @@ class BaseService(object):
     MAX_RETRIES = 4  ## TODO:  check the config file
 
     AUTH_CLASS = None
-    ENV_URL    = None
+    URL_ENVVAR = None
 
     ARGS = []
 
@@ -68,7 +68,7 @@ class BaseService(object):
         if self.args.get('userregion'):
             self.process_userregion(self.args['userregion'])
         # Environment comes next
-        self.process_url(os.getenv(self.ENV_URL))
+        self.process_url(os.getenv(self.URL_ENVVAR))
         # Finally, try the config file
         if self.endpoint is None:
             self.process_url(self.config.get_region_option(self.NAME + '-url'))
