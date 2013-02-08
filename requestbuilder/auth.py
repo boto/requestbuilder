@@ -12,11 +12,14 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
 # OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
+from __future__ import absolute_import
+
 import argparse
 import base64
 import hashlib
 import hmac
 import os
+import logging
 import requests.auth
 import six
 import time
@@ -35,8 +38,14 @@ class BaseAuth(requests.auth.AuthBase):
     def __init__(self, service, **kwargs):
         self.args    = kwargs
         self.config  = service.config
-        self.log     = service.log.getChild(self.__class__.__name__)
         self.service = service
+
+        # Yes, service.log.getChild is shorter, but it was added in 2.7.
+        if service.log is logging.root:
+            self.log = logging.getLogger(self.__class__.__name__)
+        else:
+            self.log = logging.getLogger('{0}.{1}'.format(
+                    service.log.name, self.__class__.__name__))
 
     def collect_arg_objs(self):
         return aggregate_subclass_fields(self.__class__, 'ARGS')

@@ -12,13 +12,21 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
 # OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
+from __future__ import absolute_import
+
 import ConfigParser
 import itertools
+import logging
 
 class Config(object):
     def __init__(self, filenames, log=None):
         if log:
-            self.log = log.getChild('config')
+            # Yes, service.log.getChild is shorter, but it was added in 2.7.
+            print dir(logging)
+            if log is logging.root:
+                self.log = logging.getChild('config')
+            else:
+                self.log = logging.getLogger('{0}.config'.format(log.name))
         else:
             self.log = _FakeLogger()
         self.globals = {}
