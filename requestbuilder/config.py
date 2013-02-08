@@ -22,7 +22,6 @@ class Config(object):
     def __init__(self, filenames, log=None):
         if log:
             # Yes, service.log.getChild is shorter, but it was added in 2.7.
-            print dir(logging)
             if log is logging.root:
                 self.log = logging.getChild('config')
             else:
