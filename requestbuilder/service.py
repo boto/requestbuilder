@@ -13,11 +13,13 @@
 # OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 import copy
+import functools
 import os.path
 import random
 import requests.exceptions
 import time
 import urlparse
+import weakref
 
 from .exceptions import ClientError, ServiceInitError
 from .util import aggregate_subclass_fields
@@ -43,6 +45,7 @@ class BaseService(object):
 
         if self.AUTH_CLASS is not None:
             self.auth = self.AUTH_CLASS(self)
+            self.auth.service = weakref.proxy(self)
         else:
             self.auth = None
 
@@ -80,16 +83,13 @@ class BaseService(object):
 
     @property
     def session(self):
-        if self._session is not None:
-            return self._session
-        if requests.__version__ >= '1.0':
-            self._session = requests.session()
-            self._session.auth = self.auth
-            for key, val in self.session_args.iteritems():
-                setattr(self._session, key, val)
-        else:
-            self._session = requests.session(auth=self.auth,
-                                             **self.session_args)
+        if self._session is None:
+            if requests.__version__ >= '1.0':
+                self._session = requests.session()
+                for key, val in self.session_args.iteritems():
+                    setattr(self._session, key, val)
+            else:
+                self._session = requests.session(**self.session_args)
         return self._session
 
     def validate_config(self):
@@ -136,69 +136,90 @@ class BaseService(object):
         else:
             url = self.endpoint
 
-        ## TODO:  replace pre_send and post_request hooks for use with requests 1
-        hooks = {'pre_send':     _log_request_data(self.log),
-                 'response':     _log_response_data(self.log),
-                 'post_request': RetryOnStatuses((500, 503), self.MAX_RETRIES,
-                                                  logger=self.log)}
+        hooks = {'pre_send': functools.partial(_log_request_data,  self.log),
+                 'response': functools.partial(_log_response_data, self.log)}
+        # Note that pre_send only works on requests 0
 
         try:
-            return self.session.request(method=method, url=url, params=params,
-                                        data=data, headers=headers,
-                                        hooks=hooks)
+            max_tries = self.MAX_RETRIES + 1
+            assert max_tries >= 1
+            for attempt_no, delay in enumerate(_generate_delays(max_tries), 1):
+                # Use exponential backoff if this is a retry
+                if delay > 0:
+                    self.log.debug('will retry after %.3f seconds', delay)
+                    time.sleep(delay)
+
+                self.log.info('sending request (attempt %i of %i)', attempt_no,
+                              max_tries)
+                request = requests.Request(method=method, url=url,
+                                           params=params, data=data,
+                                           headers=headers)
+                # Requests 1 gives auth handlers PreparedRequests instead of the
+                # original Requests like version 0 does.  Since most of our auth
+                # handlers inspect and/or modify things that aren't headers, we
+                # manually apply auth to it here to make things less painful.
+                self.auth(request)
+                if requests.__version__ >= '1.0':
+                    # A prepared request gives us extra info we want to log
+                    p_request = request.prepare()
+                    p_request.hooks = {'response': hooks['response']}
+                    self.log.debug('request method: %s', request.method)
+                    self.log.debug('request url:    %s', p_request.url)
+                    if isinstance(p_request.headers, dict):
+                        for key, val in sorted(p_request.headers.iteritems()):
+                            self.log.debug('request header: %s: %s', key, val)
+                    if isinstance(request.params, dict):
+                        for key, val in sorted(request.params.iteritems()):
+                            self.log.debug('request param:  %s: %s', key, val)
+                    if isinstance(request.data, dict):
+                        for key, val in sorted(request.data.iteritems()):
+                            self.log.debug('request data:   %s: %s', key, val)
+                    response = self.session.send(p_request)
+                else:
+                    request.session = self.session
+                    # A hook lets us log all the info that requests adds right
+                    # before sending
+                    request.hooks = hooks
+                    request.send()
+                    response = request.response
+                if response.status_code not in (500, 503):
+                    break
+                # If it *was* in that list, retry
+            return response
         except requests.exceptions.ConnectionError as exc:
             raise ClientError('connection error')
         except requests.exceptions.RequestException as exc:
             raise ClientError(exc)
 
 
-class RetryOnStatuses(object):
-    def __init__(self, statuses, max_retries, logger=None):
-        self.statuses    = statuses
-        self.max_retries = max_retries
-        self.current_try = 0
-        self.logger      = logger
-
-    def __call__(self, request):
-        if (request.response.status_code in self.statuses and
-            self.current_try < self.max_retries):
-            # Exponential backoff
-            self.current_try += 1
-            delay = (1 + random.random()) ** self.current_try
-            if self.logger:
-                self.logger.info('Retrying after %.3f seconds', delay)
-            time.sleep((1 + random.random()) ** self.current_try)
-            orig_response = request.response
-            request.send(anyway=True)
-            request.response.history = (orig_response.history +
-                    [orig_response] + request.response.history)
+# Note that the hook this is meant to run as was removed from requests 1.
+def _log_request_data(logger, request):
+    logger.debug('request method: %s', request.method)
+    logger.debug('request url:    %s', request.full_url)
+    if isinstance(request.headers, dict):
+        for key, val in sorted(request.headers.iteritems()):
+            logger.debug('request header: %s: %s', key, val)
+    if isinstance(request.params, dict):
+        for key, val in sorted(request.params.iteritems()):
+            logger.debug('request param:  %s: %s', key, val)
+    if isinstance(request.data, dict):
+        for key, val in sorted(request.data.iteritems()):
+            logger.debug('request data:   %s: %s', key, val)
 
 
-def _log_request_data(logger):
-    def __log_request_data(request):
-        logger.debug('request method: %s', request.method)
-        logger.debug('request url:    %s', request.url)
-        if isinstance(request.headers, dict):
-            for key, val in sorted(request.headers.iteritems()):
-                logger.debug('request header: %s: %s', key, val)
-        if isinstance(request.params, dict):
-            for key, val in sorted(request.params.iteritems()):
-                logger.debug('request param:  %s: %s', key, val)
-        if isinstance(request.data, dict):
-            for key, val in sorted(request.data.iteritems()):
-                logger.debug('request data:   %s: %s', key, val)
-    return __log_request_data
+def _log_response_data(logger, response):
+    if response.status_code >= 400:
+        logger.error('response status: %i', response.status_code)
+    else:
+        logger.info('response status: %i', response.status_code)
+    if isinstance(response.headers, dict):
+        for key, val in sorted(response.headers.items()):
+            logger.debug('response header: %s: %s', key, val)
 
 
-def _log_response_data(logger):
-    def __log_response_data(response):
-        if response.status_code >= 400:
-            logger.error('response status: %i', response.status_code)
-        elif response.status_code >= 300:
-            logger.info('response status: %i', response.status_code)
-        else:
-            logger.debug('response status: %i', response.status_code)
-        if isinstance(response.headers, dict):
-            for key, val in sorted(response.headers.items()):
-                logger.debug('response header: %s: %s', key, val)
-    return __log_response_data
+def _generate_delays(max_tries):
+    if max_tries >= 1:
+        yield 0
+        for retry_no in range(1, max_tries):
+            next_delay = (random.random() + 1) * 2 ** (retry_no - 1)
+            yield min((next_delay, 15))

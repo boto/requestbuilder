@@ -20,7 +20,6 @@ import hashlib
 import hmac
 import os
 import logging
-import requests.auth
 import six
 import time
 import urllib
@@ -32,7 +31,7 @@ from .util import aggregate_subclass_fields
 ISO8601 = '%Y-%m-%dT%H:%M:%SZ'
 
 
-class BaseAuth(requests.auth.AuthBase):
+class BaseAuth(object):
     ARGS = []
 
     def __init__(self, service, **kwargs):
@@ -111,7 +110,8 @@ class QuerySigV2Auth(HmacKeyAuth):
     '''
 
     def __call__(self, req):
-        # We assume that req.params is a dict
+        if req.params is None:
+            req.params = {}
         req.params['AWSAccessKeyId']   = self.args['key_id']
         req.params['SignatureVersion'] = 2
         req.params['SignatureMethod']  = 'HmacSHA256'
