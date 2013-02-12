@@ -67,6 +67,7 @@ class BaseRequest(BaseCommand):
 
     SERVICE_CLASS = BaseService
     NAME          = None
+    METHOD        = 'GET'
 
     FILTERS = []
     LIST_MARKERS = []
@@ -75,7 +76,8 @@ class BaseRequest(BaseCommand):
     def __init__(self, service=None, **kwargs):
         self.service = service
         # Parts of the HTTP request to be sent to the server.
-        self.method    = 'GET'
+        self.method    = self.METHOD
+        self.path      = None
         self.headers   = {}
         self.params    = {}
         self.body      = None
@@ -137,7 +139,7 @@ class BaseRequest(BaseCommand):
         headers.setdefault('User-Agent', self.user_agent)
         params  = self.prepare_params()
         self.response = self.service.send_request(method=self.method,
-                headers=headers, params=params, data=self.body)
+                path=self.path, headers=headers, params=params, data=self.body)
         try:
             if 200 <= self.response.status_code < 300:
                 parsed = self.parse_response(self.response)
