@@ -16,6 +16,7 @@ from __future__ import absolute_import
 
 import argparse
 import base64
+import email.utils
 import hashlib
 import hmac
 import os
@@ -101,6 +102,77 @@ class HmacKeyAuth(BaseAuth):
                                                             redact=True)
             if config_secret_key:
                 self.args['secret_key'] = config_secret_key
+
+
+class S3RestAuth(HmacKeyAuth):
+    '''
+    S3 REST authentication
+    http://docs.aws.amazon.com/AmazonS3/latest/dev/RESTAuthentication.html
+    '''
+
+    def __call__(self, req):
+        if req.headers is None:
+            req.headers = {}
+        req.headers['Date'] = email.utils.formatdate()
+        req.headers['Host'] = urlparse.urlparse(req.url).netloc
+        if 'Signature' in req.headers:
+            del req.headers['Signature']
+        c_headers = self.get_canonicalized_headers(req)
+        self.log.debug('canonicalized_headers: %s', repr(c_headers))
+        c_resource = self.get_canonicalized_resource(req)
+        self.log.debug('canonicalized resource: %s', repr(c_resource))
+        to_sign = '\n'.join((req.method.upper(),
+                             req.headers.get('Content-MD5', ''),
+                             req.headers.get('Content-Type', ''),
+                             req.headers.get('Date'),
+                             c_headers + c_resource))
+        self.log.debug('string to sign: %s', repr(to_sign))
+        signature = self.sign_string(to_sign.encode('utf-8'))
+        self.log.debug('b64-encoded signature: %s', signature)
+        req.headers['Authorization'] = 'AWS {0}:{1}'.format(self.args['key_id'],
+                                                            signature)
+
+    def get_canonicalized_resource(self, req):
+        # /bucket/keyname
+        parsed_req_path = urlparse.urlparse(req.url).path
+        assert self.service.endpoint is not None
+        parsed_svc_path = urlparse.urlparse(self.service.endpoint).path
+        # IMPORTANT:  this only supports path-style requests
+        assert parsed_req_path.startswith(parsed_svc_path)
+        resource = parsed_req_path[len(parsed_svc_path):]
+        if parsed_svc_path.endswith('/'):
+            # The leading / got stripped off
+            resource = '/' + resource
+
+        # Now append sub-resources, a.k.a. query string parameters
+        if req.params:
+            subresources = []
+            for key, val in sorted(req.params.iteritems()):
+                if val is None:
+                    subresources.append(key)
+                else:
+                    subresources.append(key + '=' + val)
+            resource += '?' + '&'.join(subresources)
+        return resource
+
+    def get_canonicalized_headers(self, req):
+        headers_dict = {}
+        for key, val in req.headers.iteritems():
+            if key.lower().startswith('x-amz-'):
+                headers_dict.setdefault(key.lower(), [])
+                headers_dict[key.lower()].append(' '.join(val.split()))
+        headers_strs = []
+        for key, vals in sorted(headers_dict.iteritems()):
+            headers_strs.append('{0}:{1}'.format(key, ','.join(vals)))
+        if headers_strs:
+            return '\n'.join(headers_strs) + '\n'
+        else:
+            return ''
+
+    def sign_string(self, to_sign):
+        req_hmac = hmac.new(self.args['secret_key'], digestmod=hashlib.sha1)
+        req_hmac.update(to_sign)
+        return base64.b64encode(req_hmac.digest())
 
 
 class QuerySigV2Auth(HmacKeyAuth):
