@@ -167,6 +167,20 @@ class BaseRequest(BaseCommand):
     def parse_response(self, response):
         return response
 
+    def log_and_parse_response(self, response, parse_func, **kwargs):
+        # We do some extra handling here to log stuff as it comes in rather
+        # than reading it all into memory at once.
+        self.log.debug('-- response content --\n', extra={'append': True})
+        # Using Response.iter_content gives us automatic decoding, but we then
+        # have to make the generator look like a file so etree can use it.
+        with _IteratorFileObjAdapter(self.response.iter_content(16384)) \
+                as content_fileobj:
+            logged_fileobj = _ReadLoggingFileWrapper(content_fileobj, self.log,
+                                                     logging.DEBUG)
+            parsed_response = parse_func(logged_fileobj, **kwargs)
+        self.log.debug('-- end of response content --')
+        return parsed_response
+
     def main(self):
         '''
         The main processing method for this type of request.  In this method,
@@ -230,20 +244,10 @@ class AWSQueryRequest(BaseRequest):
 
     def parse_response(self, response):
         # Parser for list-delimited responses like EC2's
-
-        # We do some extra handling here to log stuff as it comes in rather
-        # than reading it all into memory at once.
-        self.log.debug('-- response content --\n', extra={'append': True})
-        # Using Response.iter_content gives us automatic decoding, but we then
-        # have to make the generator look like a file so etree can use it.
-        with _IteratorFileObjAdapter(self.response.iter_content(16384)) \
-                as content_fileobj:
-            logged_fileobj = _ReadLoggingFileWrapper(content_fileobj, self.log,
-                                                     logging.DEBUG)
-            response_dict = parse_listdelimited_aws_xml(logged_fileobj,
-                                                        self.LIST_MARKERS)
-        self.log.debug('-- end of response content --')
+        response_dict = self.log_and_parse_response(response,
+                parse_listdelimited_aws_xml, list_markers=self.LIST_MARKERS)
         # Strip off the root element
+        assert len(response_dict) == 1
         return response_dict[list(response_dict.keys())[0]]
 
     def flatten_params(self, args, prefix=None):
