@@ -110,6 +110,12 @@ class S3RestAuth(HmacKeyAuth):
     http://docs.aws.amazon.com/AmazonS3/latest/dev/RESTAuthentication.html
     '''
 
+    # This list comes from the CanonicalizedResource section of the above page
+    HASHED_PARAMS = set(('acl', 'lifecycle', 'location', 'logging',
+            'notification', 'partNumber', 'policy', 'requestPayment',
+            'torrent', 'uploadId', 'uploads', 'versionId', 'versioning',
+            'versions', 'website'))
+
     def __call__(self, req):
         if req.headers is None:
             req.headers = {}
@@ -148,11 +154,15 @@ class S3RestAuth(HmacKeyAuth):
         if req.params:
             subresources = []
             for key, val in sorted(req.params.iteritems()):
-                if val is None:
-                    subresources.append(key)
-                else:
-                    subresources.append(key + '=' + val)
-            resource += '?' + '&'.join(subresources)
+                if key in self.HASHED_PARAMS:
+                    if val is None:
+                        subresources.append(key)
+                    else:
+                        print '{0}={1}'.format(key, val), key + '=' + val
+                        #subresources.append('{0}={1}'.format(key, val))
+                        subresources.append(key + '=' + val)
+                if subresources:
+                    resource += '?' + '&'.join(subresources)
         return resource
 
     def get_canonicalized_headers(self, req):
