@@ -153,7 +153,8 @@ class BaseService(object):
                               max_tries)
                 request = requests.Request(method=method, url=url,
                                            params=params, data=data,
-                                           headers=headers)
+                                           headers=headers,
+                                           allow_redirects=True)
                 # Requests 1 gives auth handlers PreparedRequests instead of the
                 # original Requests like version 0 does.  Since most of our auth
                 # handlers inspect and/or modify things that aren't headers, we
@@ -185,11 +186,20 @@ class BaseService(object):
                 if response.status_code not in (500, 503):
                     break
                 # If it *was* in that list, retry
+            if response.status_code >= 300:
+                # We include redirects because at this point, requests should
+                # have handled it, but hasn't done so for some reason.
+                self.handle_http_error(response)
             return response
         except requests.exceptions.ConnectionError as exc:
             raise ClientError('connection error')
+        except requests.exceptions.HTTPError as exc:
+            return self.handle_http_error(response, exc)
         except requests.exceptions.RequestException as exc:
             raise ClientError(exc)
+
+    def handle_http_error(self, response, err):
+        raise ServerError(response)
 
 
 # Note that the hook this is meant to run as was removed from requests 1.

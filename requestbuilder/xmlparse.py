@@ -48,29 +48,33 @@ def parse_aws_xml(xml_stream, list_item_markers=None):
     if list_item_markers is None:
         list_item_markers = ()
     stack = [(None, {})]
-    for event, elem in ElementTree.iterparse(xml_stream,
-                                             events=('start', 'end')):
-        tag = _strip_tag(elem.tag)
-        if event == 'start':
-            stack.append((tag, {}))
-        if event == 'end':
-            if tag in list_item_markers:
-                # We're ending a list item, so append it to stack[-2]'s list
-                stack[-2][1].setdefault(tag, [])
-                if stack[-1][1] == {}:
-                    # No inner elements; use text instead
-                    stack[-2][1][tag].append(elem.text)
+    try:
+        for event, elem in ElementTree.iterparse(xml_stream,
+                                                 events=('start', 'end')):
+            tag = _strip_tag(elem.tag)
+            if event == 'start':
+                stack.append((tag, {}))
+            if event == 'end':
+                if tag in list_item_markers:
+                    # We're ending a list item, so append it to stack[-2]'s list
+                    stack[-2][1].setdefault(tag, [])
+                    if stack[-1][1] == {}:
+                        # No inner elements; use text instead
+                        stack[-2][1][tag].append(elem.text)
+                    else:
+                        stack[-2][1][tag].append(stack[-1][1])
                 else:
-                    stack[-2][1][tag].append(stack[-1][1])
-            else:
-                if stack[-1][1] == {}:
-                    # No inner elements; use text instead
-                    stack[-2][1][tag] = elem.text
-                else:
-                    stack[-2][1][tag] = stack[-1][1]
-            stack.pop()
-            elem.clear()
+                    if stack[-1][1] == {}:
+                        # No inner elements; use text instead
+                        stack[-2][1][tag] = elem.text
+                    else:
+                        stack[-2][1][tag] = stack[-1][1]
+                stack.pop()
+                elem.clear()  # free up some memory
+    except ElementTree.ParseError:
+        raise ValueError('XML parse error')
     return stack[0][1]
+
 
 def parse_listdelimited_aws_xml(xml_stream, list_markers=None):
     '''
@@ -103,34 +107,38 @@ def parse_listdelimited_aws_xml(xml_stream, list_markers=None):
     if list_markers is None:
         list_markers = ()
     stack = [(None, {})]
-    for event, elem in ElementTree.iterparse(xml_stream,
-                                             events=('start', 'end')):
-        tag = _strip_tag(elem.tag)
-        if event == 'start':
-            if tag in list_markers:
-                # Start a new list
-                stack.append((tag, []))
-            else:
-                stack.append((tag, {}))
-        elif event == 'end':
-            assert tag == stack[-1][0]
-            if isinstance(stack[-2][1], list):
-                # Add the thing we just finished parsing to the list
-                if stack[-1][1] == {}:
-                    # No inner elements; use text instead
-                    stack[-2][1].append(elem.text)
+    try:
+        for event, elem in ElementTree.iterparse(xml_stream,
+                                                 events=('start', 'end')):
+            tag = _strip_tag(elem.tag)
+            if event == 'start':
+                if tag in list_markers:
+                    # Start a new list
+                    stack.append((tag, []))
                 else:
-                    stack[-2][1].append(stack[-1][1])
-            else:
-                # Add the thing we just finished parsing to the dict
-                if stack[-1][1] == {}:
-                    # No inner elements; use text instead
-                    stack[-2][1][tag] = elem.text
+                    stack.append((tag, {}))
+            elif event == 'end':
+                assert tag == stack[-1][0]
+                if isinstance(stack[-2][1], list):
+                    # Add the thing we just finished parsing to the list
+                    if stack[-1][1] == {}:
+                        # No inner elements; use text instead
+                        stack[-2][1].append(elem.text)
+                    else:
+                        stack[-2][1].append(stack[-1][1])
                 else:
-                    stack[-2][1][tag] = stack[-1][1]
-            stack.pop()
-            elem.clear()
+                    # Add the thing we just finished parsing to the dict
+                    if stack[-1][1] == {}:
+                        # No inner elements; use text instead
+                        stack[-2][1][tag] = elem.text
+                    else:
+                        stack[-2][1][tag] = stack[-1][1]
+                stack.pop()
+                elem.clear()  # free up some memory
+    except ElementTree.ParseError:
+        raise ValueError('XML parse error')
     return stack[0][1]
+
 
 def _strip_tag(elem_tag):
     if elem_tag.startswith('{'):

@@ -138,28 +138,30 @@ class BaseRequest(BaseCommand):
         headers = dict(self.headers or {})
         headers.setdefault('User-Agent', self.user_agent)
         params  = self.prepare_params()
-        self.response = self.service.send_request(method=self.method,
-                path=self.path, headers=headers, params=params, data=self.body)
         try:
-            if 200 <= self.response.status_code < 300:
-                parsed = self.parse_response(self.response)
-                self.log.info('result: success')
-                return parsed
-            else:
-                self.log.debug('-- response content --\n',
-                               extra={'append': True})
-                self.log.debug(self.response.text, extra={'append': True})
-                self.log.debug('-- end of response content --')
-                self.log.info('result: failure')
-                raise ServerError(self.response.status_code,
-                                  self.response.content)
+            self.response = self.service.send_request(method=self.method,
+                    path=self.path, headers=headers, params=params,
+                    data=self.body)
+            return self.parse_response(self.response)
+        except ServerError as err:
+            self.response = err.response
+            return self.handle_server_error(err)
         finally:
             # Empty the socket buffer so it can be reused
             try:
-                self.response.content
+                if self.response is not None:
+                    self.response.content
             except RuntimeError:
                 # The content was already consumed
                 pass
+
+    def handle_server_error(self, err):
+        self.log.debug('-- response content --\n',
+                       extra={'append': True})
+        self.log.debug(self.response.text, extra={'append': True})
+        self.log.debug('-- end of response content --')
+        self.log.info('result: failure')
+        raise
 
     def prepare_params(self):
         return self.params or {}
@@ -203,12 +205,7 @@ class BaseRequest(BaseCommand):
 
     def handle_cli_exception(self, err):
         if isinstance(err, ServerError):
-            if err.code:
-                print >> sys.stderr, 'error ({code}) {msg}'.format(
-                        code=err.code, msg=err.message or '')
-            else:
-                print >> sys.stderr, 'error {msg}'.format(
-                        msg=err.message or '')
+            print >> sys.stderr, 'error ', str(err)
             if self.debug:
                 raise
             sys.exit(1)
