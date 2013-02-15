@@ -61,6 +61,7 @@ class BaseCommand(object):
     '''
 
     DESCRIPTION = ''
+    USAGE = None
     ARGS = [Arg('-D', '--debug', action='store_true', route_to=None,
                 help='show debugging output'),
             Arg('--debugger', action='store_true', route_to=None,
@@ -132,7 +133,8 @@ class BaseCommand(object):
         description = '\n\n'.join([textwrap.fill(textwrap.dedent(para))
                                    for para in self.DESCRIPTION.split('\n\n')])
         parser = argparse.ArgumentParser(description=description,
-                formatter_class=argparse.RawDescriptionHelpFormatter)
+                formatter_class=argparse.RawDescriptionHelpFormatter,
+                usage=self.USAGE)
         arg_objs = self.collect_arg_objs()
         self.preprocess_arg_objs(arg_objs)
         self.populate_parser(parser, arg_objs)
