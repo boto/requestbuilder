@@ -205,7 +205,7 @@ class BaseRequest(BaseCommand):
 
     def handle_cli_exception(self, err):
         if isinstance(err, ServerError):
-            print >> sys.stderr, 'error ', str(err)
+            print >> sys.stderr, 'error:', str(err)
             if self.debug:
                 raise
             sys.exit(1)

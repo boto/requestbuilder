@@ -206,7 +206,7 @@ class BaseCommand(object):
         try:
             cmd = cls(_do_cli=True)
         except Exception as err:
-            print >> sys.stderr, 'error: {0}'.format(err)
+            print >> sys.stderr, 'error:', err.message
             # Since we don't even have a config file to consult our options for
             # determining when debugging is on are limited to what we got at
             # the command line.
@@ -245,7 +245,7 @@ class BaseCommand(object):
         return False
 
     def handle_cli_exception(self, err):
-        print >> sys.stderr, 'error: {0}'.format(err)
+        print >> sys.stderr, 'error:', err.message
         if self.debug:
             raise
         sys.exit(1)
