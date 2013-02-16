@@ -14,11 +14,11 @@
 
 
 class PaginatedResponse(dict):
-    def __init__(self, request, items, item_names):
-        assert len(items) > 0
-        self.iter_cache   = dict((key, []) for key in item_names)
-        self.request      = request
-        self.stack        = list((item, None) for item in reversed(items))
+    def __init__(self, request, pages, item_names):
+        assert len(pages) > 0
+        self.iter_cache = dict((key, []) for key in item_names)
+        self.request    = request
+        self.stack      = list(reversed(pages))
         self.fetch_next_page()  # get an initial response
         for key in self.iter_cache:
             self[key] = ResponseItemGenerator(key, self)
@@ -26,15 +26,15 @@ class PaginatedResponse(dict):
     def fetch_next_page(self):
         if len(self.stack) == 0:
             raise StopIteration()
-        item, markers = self.stack.pop()
-        self.request.prepare_for_page(item, markers)
+        page = self.stack.pop()
+        self.request.prepare_for_page(page)
         response = self.request.send()
-        next_markers = self.request.get_page_markers(response)
+        next_page = self.request.get_next_page(response)
         for key in self.iter_cache:
             self.iter_cache[key].extend(response.pop(key, []) or [])
-        if next_markers is not None:
-            # Need to ask for more results for that item later
-            self.stack.append((item, next_markers))
+        if next_page is not None:
+            # Need to ask for another page of results later
+            self.stack.append(next_page)
         self.update(response)
 
 
