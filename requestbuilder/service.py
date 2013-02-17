@@ -107,7 +107,7 @@ class BaseService(object):
                 endpoint   = url
                 userregion = None
             if self.endpoint is None:
-                self.endpoint = url
+                self.endpoint = endpoint
             if userregion:
                 self.process_userregion(userregion)
 
