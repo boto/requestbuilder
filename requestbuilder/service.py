@@ -73,8 +73,7 @@ class BaseService(object):
         # Environment comes next
         self.process_url(os.getenv(self.URL_ENVVAR))
         # Finally, try the config file
-        if self.endpoint is None:
-            self.process_url(self.config.get_region_option(self.NAME + '-url'))
+        self.process_url(self.config.get_region_option(self.NAME + '-url'))
 
         # Ensure everything is okay and finish up
         self.validate_config()

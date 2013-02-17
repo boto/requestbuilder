@@ -82,7 +82,7 @@ class Config(object):
             return self.current_region
         if 'default-region' in self.globals:
             return self.globals['default-region']
-        raise KeyError('no region was chosen')
+        return None
 
     @property
     def current_user(self):
@@ -104,7 +104,7 @@ class Config(object):
                 return region_user
         if 'default-user' in self.globals:
             return self.globals['default-user']
-        raise KeyError('no user was chosen')
+        return None
 
     def get_global_option(self, option):
         return self.globals.get(option)
@@ -116,6 +116,8 @@ class Config(object):
     def get_user_option(self, option, user=None, redact=False):
         if user is None:
             user = self.get_user()
+        if user is None:
+            return None
         return self._lookup_recursively('users', self.users, user, option,
                                         redact=redact)
 
@@ -126,6 +128,8 @@ class Config(object):
     def get_region_option(self, option, region=None, redact=False):
         if region is None:
             region = self.get_region()
+        if region is None:
+            return None
         return self._lookup_recursively('regions', self.regions, region,
                                         option, redact=redact)
 
@@ -178,8 +182,7 @@ class Config(object):
                         print_value = '<redacted>'
                     else:
                         print_value = repr(value)
-                    self.log.info('option value %s = %s', repr(option),
-                                  print_value)
+                    self.log.info('option %s = %s', repr(option), print_value)
                     return memoize(value)
         # That didn't work; try matching something higher in the hierarchy.
         # Example:  'us-east-1' -> 'aws:us-east-1'
@@ -200,7 +203,7 @@ class Config(object):
                     raise ValueError(
                             '{0} is ambiguous; closest matches are {1}'.format(
                             repr(section), ', '.join(map(repr, matches))))
-        self.log.info('option value %s not found', repr(option))
+        self.log.info('option %s not found', repr(option))
         return memoize(None)
 
 
