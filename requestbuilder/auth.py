@@ -21,6 +21,7 @@ import hashlib
 import hmac
 import os
 import logging
+import re
 import six
 import time
 import urllib
@@ -211,7 +212,10 @@ class QuerySigV2Auth(HmacKeyAuth):
                                  urllib.quote(val, safe='-_~'))
         query_string = '&'.join(quoted_params)
         to_sign += query_string
-        self.log.debug('string to sign: %s', repr(to_sign))
+        # Redact passwords
+        redacted_to_sign = re.sub('assword=[^&]*', 'assword=<redacted>',
+                                  to_sign)
+        self.log.debug('string to sign: %s', repr(redacted_to_sign))
         signature = self.sign_string(to_sign)
         self.log.debug('b64-encoded signature: %s', signature)
         req.params['Signature'] = signature
