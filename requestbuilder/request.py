@@ -91,7 +91,7 @@ class BaseRequest(BaseCommand):
 
     def _post_init(self):
         if self.service is None:
-            self.service = self.SERVICE_CLASS(self.config, self.log)
+            self.service = self.SERVICE_CLASS(self.config, self.log.level)
         BaseCommand._post_init(self)
 
     @property

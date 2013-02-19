@@ -12,8 +12,11 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
 # OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
+from __future__ import absolute_import
+
 import copy
 import functools
+import logging
 import os.path
 import random
 import requests.exceptions
@@ -35,11 +38,12 @@ class BaseService(object):
 
     ARGS = []
 
-    def __init__(self, config, log, **kwargs):
-        self.args     = kwargs
-        self.config   = config
-        self.endpoint = None
-        self.log      = log
+    def __init__(self, config, loglevel, **kwargs):
+        self.args      = kwargs
+        self.config    = config
+        self.endpoint  = None
+        self.log       = logging.getLogger(self.__class__.__name__)
+        self.log.level = loglevel
         self.session_args = {'verify': False}  # SSL verification is opt-in
         self._session = None
 
