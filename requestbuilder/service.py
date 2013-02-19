@@ -167,12 +167,18 @@ class BaseService(object):
                     self.log.debug('request url:    %s', p_request.url)
                     if isinstance(p_request.headers, dict):
                         for key, val in sorted(p_request.headers.iteritems()):
+                            if key.lower().endswith('password'):
+                                val = '<redacted>'
                             self.log.debug('request header: %s: %s', key, val)
                     if isinstance(request.params, dict):
                         for key, val in sorted(request.params.iteritems()):
+                            if key.lower().endswith('password'):
+                                val = '<redacted>'
                             self.log.debug('request param:  %s: %s', key, val)
                     if isinstance(request.data, dict):
                         for key, val in sorted(request.data.iteritems()):
+                            if key.lower().endswith('password'):
+                                val = '<redacted>'
                             self.log.debug('request data:   %s: %s', key, val)
                     response = self.session.send(p_request)
                 else:
@@ -207,12 +213,18 @@ def _log_request_data(logger, request):
     logger.debug('request url:    %s', request.full_url)
     if isinstance(request.headers, dict):
         for key, val in sorted(request.headers.iteritems()):
+            if key.lower().endswith('password'):
+                val = '<redacted>'
             logger.debug('request header: %s: %s', key, val)
     if isinstance(request.params, dict):
         for key, val in sorted(request.params.iteritems()):
+            if key.lower().endswith('password'):
+                val = '<redacted>'
             logger.debug('request param:  %s: %s', key, val)
     if isinstance(request.data, dict):
         for key, val in sorted(request.data.iteritems()):
+            if key.lower().endswith('password'):
+                val = '<redacted>'
             logger.debug('request data:   %s: %s', key, val)
 
 

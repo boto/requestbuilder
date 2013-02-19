@@ -236,7 +236,14 @@ class AWSQueryRequest(BaseRequest):
         params = self.flatten_params(self.params)
         params['Action'] = self.name
         params['Version'] = self.API_VERSION or self.service.API_VERSION
-        self.log.info('parameters: %s', params)
+        redacted_params = dict(params)
+        for key in params:
+            if key.lower().endswith('password'):
+                # This makes it slightly more obvious that this is redacted by
+                # the framework and not just a string.
+                redacted_params[key] = type('REDACTED', (),
+                        {'__repr__': lambda self: '<redacted>'})()
+        self.log.info('parameters: %s', redacted_params)
         return params
 
     def parse_response(self, response):
