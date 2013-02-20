@@ -38,12 +38,13 @@ class BaseService(object):
 
     ARGS = []
 
-    def __init__(self, config, loglevel, **kwargs):
+    def __init__(self, config, loglevel=None, **kwargs):
         self.args      = kwargs
         self.config    = config
         self.endpoint  = None
         self.log       = logging.getLogger(self.__class__.__name__)
-        self.log.level = loglevel
+        if loglevel is not None:
+            self.log.level = loglevel
         self.session_args = {'verify': False}  # SSL verification is opt-in
         self._session = None
 
