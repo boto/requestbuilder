@@ -62,10 +62,7 @@ class BaseCommand(object):
 
     DESCRIPTION = ''
     USAGE = None
-    ARGS = [Arg('-D', '--debug', action='store_true', route_to=None,
-                help='show debugging output'),
-            Arg('--debugger', action='store_true', route_to=None,
-                help='enable interactive debugger on error')]
+    ARGS = []
 
     def __init__(self, _do_cli=False, **kwargs):
         self.args          = kwargs
@@ -73,6 +70,7 @@ class BaseCommand(object):
         self.log           = None  # created by _configure_logging
         self._arg_routes   = {}
         self._cli_parser   = None  # created by _build_parser
+        self.__debug       = False
 
         self._configure_logging()
         self._process_configfiles()
@@ -124,10 +122,6 @@ class BaseCommand(object):
             configure_root_logger(use_color=True)
         else:
             configure_root_logger()
-        if self.args.get('debugger'):
-            sys.excepthook = _debugger_except_hook(
-                    self.args.get('debugger', False),
-                    self.args.get('debug', False))
 
     def _build_parser(self):
         description = '\n\n'.join([textwrap.fill(textwrap.dedent(para))
@@ -138,8 +132,17 @@ class BaseCommand(object):
         arg_objs = self.collect_arg_objs()
         self.preprocess_arg_objs(arg_objs)
         self.populate_parser(parser, arg_objs)
+        # Low-level basic args that affect the core of the framework
+        # These don't actually show up once CLI args finish processing.
+        parser.add_argument('--debug', action='store_true', dest='_debug',
+                            default=argparse.SUPPRESS,
+                            help='show debugging output')
+        parser.add_argument('--debugger', action='store_true', dest='_debugger',
+                            default=argparse.SUPPRESS,
+                            help='launch interactive debugger on error')
         parser.add_argument('--version', action='store_true', dest='_version',
-                            default=argparse.SUPPRESS)
+                            default=argparse.SUPPRESS,
+                            help="show the program's version and exit")
         self._cli_parser = parser
 
     def collect_arg_objs(self):
@@ -177,6 +180,11 @@ class BaseCommand(object):
 
     def process_cli_args(self):
         cli_args = vars(self._cli_parser.parse_args())
+        if cli_args.pop('_debug', False):
+            self.__debug = True
+        if cli_args.pop('_debugger', False):
+            self.__debug = True
+            sys.excepthook = _debugger_except_hook
         if cli_args.get('_version', False):
             self.print_version_and_exit()
         # Everything goes in self.args.  distribute_args() also puts them
@@ -219,7 +227,7 @@ class BaseCommand(object):
             # Since we don't even have a config file to consult our options for
             # determining when debugging is on are limited to what we got at
             # the command line.
-            if any(arg in sys.argv for arg in ('--debug', '-D', '--debugger')):
+            if any(arg in sys.argv for arg in ('--debug', '--debugger')):
                 raise
             sys.exit(1)
         try:
@@ -246,9 +254,9 @@ class BaseCommand(object):
     def debug(self):
         if self.__config_enables_debugging():
             return True
-        if self.args.get('debug') or self.args.get('debugger'):
+        if self.__debug:
             return True
-        if any(arg in sys.argv for arg in ('--debug', '-D', '--debugger')):
+        if any(arg in sys.argv for arg in ('--debug', '--debugger')):
             # In case an error occurs during argument parsing
             return True
         return False
@@ -273,28 +281,20 @@ class BaseCommand(object):
         return self.config.get_global_option_bool('debug', False)
 
 
-def _debugger_except_hook(debugger_enabled, debug_enabled):
+def _debugger_except_hook(type_, value, tracebk):
     '''
-    Wrapper for the debugger-launching except hook
+    Launch epdb (or pdb if epdb is unavailable) when an uncaught exception
+    occurs.
     '''
-    def excepthook(type_, value, tracebk):
-        '''
-        If the debugger option is enabled, launch epdb (or pdb if epdb is
-        unavailable) when an uncaught exception occurs.
-        '''
-        if type_ is bdb.BdbQuit:
-            sys.exit(1)
-        sys.excepthook = sys.__excepthook__
+    if type_ is bdb.BdbQuit:
+        sys.exit(1)
+    sys.excepthook = sys.__excepthook__
 
-        if debugger_enabled and sys.stdout.isatty() and sys.stdin.isatty():
-            if 'epdb' in sys.modules:
-                epdb.post_mortem(tracebk, type_, value)
-            else:
-                pdb.post_mortem(tracebk)
-        elif debug_enabled:
-            traceback.print_tb(tracebk)
-            sys.exit(1)
+    if sys.stdout.isatty() and sys.stdin.isatty():
+        if 'epdb' in sys.modules:
+            epdb.post_mortem(tracebk, type_, value)
         else:
-            print value
-            sys.exit(1)
-    return excepthook
+            pdb.post_mortem(tracebk)
+    else:
+        traceback.print_tb(tracebk)
+        sys.exit(1)
