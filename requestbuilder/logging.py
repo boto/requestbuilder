@@ -16,6 +16,7 @@ from __future__ import absolute_import
 
 import logging
 
+
 class ProgressiveStreamHandler(logging.StreamHandler):
     '''
     A handler class that allows the "cursor" to stay on one line for selected
@@ -45,6 +46,7 @@ class ProgressiveStreamHandler(logging.StreamHandler):
         except Exception:
             self.handleError(record)
 
+
 class ColoringFormatter(logging.Formatter):
     LOG_COLORS = [(logging.ERROR, '\033[91m'),
                   (logging.WARN,  '\033[93m'),
@@ -57,6 +59,7 @@ class ColoringFormatter(logging.Formatter):
             if record.levelno >= level:
                 return colorcode + msg + '\033[0m'
         return msg
+
 
 def configure_root_logger(use_color=False):
     logfmt = '%(asctime)s %(levelname)-7s %(name)s %(message)s'

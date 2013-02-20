@@ -27,49 +27,45 @@ from .service import BaseService
 from .util import aggregate_subclass_fields
 from .xmlparse import parse_listdelimited_aws_xml
 
+
 class BaseRequest(BaseCommand):
     '''
-    The basis for a command line tool that represents a request.  To invoke
-    this as a command line tool, call the do_cli() method on an instance of the
-    class; arguments will be parsed from the command line.  To invoke this in
-    another context, pass keyword args to __init__() with names that match
-    those stored by the argument parser and then call main().
+    The basis for a command line tool that represents a request.  The data for
+    this request are stored in a few instance members:
+     - method:   the HTTP method to use (e.g. 'GET').  Defaults to self.METHOD.
+     - path:     the path to append to the service's path (e.g. 'sub/dir')
+     - headers:  a dict of HTTP headers
+     - params:   a dict of query parameters
+     - body:     a string or file object containing a request body, or a dict
+                 to pass to the server as form data
 
-    Important methods in this class include:
-     - do_cli:       command line entry point
-     - main:         pre/post-request processing and request sending
-     - send:         actually send a request to the server and return a
-                     response (called by the main() method)
-     - print_result: format data from the main method and print it to stdout
+    This specialization of BaseCommand that implements main() as a three-step
+    process:
+     - preprocess():   do any processing needed before sending the request,
+                       such as parsing complex command line arguments and
+                       storing them in self.params, self.headers, and so forth.
+     - send():         send this request to the server using the data stored
+                       in its attributes, parse it using self.parse_result(),
+                       and return it
+     - postprocess():  given a parsed response, do any processing needed before
+                       main() returns the response.
 
-    To be useful a tool should inherit from this class and implement the main()
-    and print_result() methods.  The do_cli() method functions as the entry
-    point for the command line, populating self.args from the command line and
-    then calling main() and print_result() in sequence.  Other tools may
-    instead supply arguments via __init__() and then call main() alone.
+    Most requests need only implement preprocess().  Requests whose workflows
+    involve sending other requests often do so in postprocess(), where the
+    result of the request is known.
 
-    Important members of this class include:
-     - SERVICE_CLASS: a class corresponding to the web service in use
-     - NAME:          a string containing the Action query parameter.  This
-                      defaults to the class's name.
-     - DESCRIPTION:   a string describing the tool.  This becomes part of the
-                      command line help string.
-     - ARGS:          a list of Arg and/or MutuallyExclusiveArgGroup objects
-                      are used to generate command line arguments.  Inheriting
-                      classes needing to add command line arguments should
-                      contain their own Args lists, which are *prepended* to
-                      those of their parent classes.
-     - FILTERS:       a list of Filter objects that are used to generate filter
-                      options at the command line.  Inheriting classes needing
-                      to add filters should contain their own FILTERS lists,
-                      which are *prepended* to those of their parent classes.
+    Important members of this class, in addition to those inherited from
+    BaseCommand, include:
+     - SERVICE_CLASS:  a class corresponding to the web service in use
+     - NAME:           a string representing the name of this request.  This
+                       defaults to the class's name.
+     - METHOD:         the HTTP method to use by default
     '''
 
     SERVICE_CLASS = BaseService
     NAME          = None
     METHOD        = 'GET'
 
-    FILTERS = []
     LIST_MARKERS = []
 
 
@@ -110,10 +106,6 @@ class BaseRequest(BaseCommand):
 
     @property
     def name(self):
-        '''
-        The name of this action.  Used when choosing what to supply for the
-        Action query parameter.
-        '''
         return self.NAME or self.__class__.__name__
 
     @property
@@ -177,9 +169,7 @@ class BaseRequest(BaseCommand):
         The main processing method for this type of request.  In this method,
         inheriting classes generally populate self.headers, self.params, and
         self.body with information gathered from self.args or elsewhere,
-        call self.send, and return the response.  BaseRequest's default
-        behavior is to simply return the result of a request with everything
-        that routes to PARAMS.
+        call self.send, and return the response.
         '''
         self.preprocess()
         response = self.send()
@@ -205,6 +195,7 @@ class BaseRequest(BaseCommand):
 
 class AWSQueryRequest(BaseRequest):
     API_VERSION = None
+    FILTERS = []
 
     def populate_parser(self, parser, arg_objs):
         BaseRequest.populate_parser(self, parser, arg_objs)
@@ -250,7 +241,7 @@ class AWSQueryRequest(BaseRequest):
         transform each element in the dict that matches the corresponding
         arg routing table into a simple dict containing key-value pairs
         suitable for use as query parameters.  This implementation flattens
-        dicts and lists into the format given by the EC2 query API, which uses
+        dicts and lists into the format given by AWS query APIs, which use
         dotted lists of dict keys and list indices to indicate nested
         structures.
 

@@ -15,6 +15,7 @@
 from . import Arg
 from .command import BaseCommand
 
+
 class TabifyingCommand(BaseCommand):
     '''
     A request mixin that provides the tabify() function along with its

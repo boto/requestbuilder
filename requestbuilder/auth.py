@@ -34,6 +34,12 @@ ISO8601 = '%Y-%m-%dT%H:%M:%SZ'
 
 
 class BaseAuth(object):
+    '''
+    Basis for all authentication
+
+    This class does nothing on its own.  It is up to you to implement the
+    necessary functions to effect an authentication scheme.
+    '''
     ARGS = []
 
     def __init__(self, service, **kwargs):
@@ -62,6 +68,9 @@ class BaseAuth(object):
 
 
 class HmacKeyAuth(BaseAuth):
+    '''
+    Basis for AWS HMAC-based authentication
+    '''
     ARGS = [Arg('-I', '--access-key-id', dest='key_id', metavar='KEY_ID',
                 route_to=AUTH),
             Arg('-S', '--secret-key', dest='secret_key', metavar='KEY',

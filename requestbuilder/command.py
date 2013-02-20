@@ -35,29 +35,27 @@ from .util import aggregate_subclass_fields
 class BaseCommand(object):
     '''
     The basis for a command line tool.  To invoke this as a command line tool,
-    call the do_cli() method on an instance of the class; arguments will be
-    parsed from the command line.  To invoke this in another context, pass
-    keyword args to __init__() with names that match those stored by the
-    argument parser and then call main().
+    call the run() method on the class.  Arguments will be parsed from the
+    command line.  To invoke this in another context, such as from inside
+    another command, pass keyword arguments to __init__() with names that match
+    those stored by the argument parser and then call main() to retrieve a
+    result.
 
-    Important methods in this class include:
-     - do_cli:       command line entry point
-     - main:         processing
-     - print_result: format data from the main method and print it to stdout
-
-    To be useful a tool should inherit from this class and implement the main()
-    and print_result() methods.  The do_cli() method functions as the entry
-    point for the command line, populating self.args from the command line and
-    then calling main() and print_result() in sequence.  Other tools may
-    instead supply arguments via __init__() and then call main() alone.
+    The general workflow of a command involves two methods:  main(), which
+    inspects the arguments stored in self.args, does something, and returns a
+    result; and print_result(), which takes the output of main() and prints it
+    to stdout.  By default, both of these methods do nothing.  It is up to you
+    to implement them to do what the tool is designed to do.
 
     Important members of this class include:
-     - DESCRIPTION:  a string describing the tool.  This becomes part of the
-                     command line help string.
-     - Args:         a list of Arg and/or MutuallyExclusiveArgGroup objects
+     - DESCRIPTION:  a string that describes the tool.  This becomes part of
+                     the command line help string.
+     - USAGE:        a usage message for the command line help string.  If this
+                     is None, one will be generated automatically.
+     - ARGS:         a list of Arg and/or MutuallyExclusiveArgGroup objects
                      are used to generate command line arguments.  Inheriting
                      classes needing to add command line arguments should
-                     contain their own Args lists, which are *prepended* to
+                     contain their own ARGS lists, which are combined with
                      those of their parent classes.
     '''
 
@@ -244,13 +242,16 @@ class BaseCommand(object):
     def name(self):
         return self.__class__.__name__
 
-    def print_result(self, data):
-        pass
-
     def main(self):
         '''
         The main processing method.  main() is expected to do something with
         self.args and return a result.
+        '''
+        pass
+
+    def print_result(self, data):
+        '''
+        Take a result produced by main() and print it to stdout.
         '''
         pass
 

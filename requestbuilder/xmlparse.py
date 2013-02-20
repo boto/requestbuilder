@@ -17,6 +17,7 @@ try:
 except ImportError:
     from xml.etree import ElementTree
 
+
 def parse_aws_xml(xml_stream, list_item_markers=None):
     '''
     Parse a stream of XML and return a nested dict.  The dict represents each

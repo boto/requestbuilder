@@ -27,6 +27,7 @@ import weakref
 from .exceptions import ClientError, ServiceInitError
 from .util import aggregate_subclass_fields
 
+
 class BaseService(object):
     NAME        = ''
     DESCRIPTION = ''
