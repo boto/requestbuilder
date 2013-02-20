@@ -74,9 +74,9 @@ class HmacKeyAuth(BaseAuth):
         self.configure_from_configfile()
 
         if not self.args.get('key_id'):
-            raise AuthError('missing access key ID')
+            raise AuthError('missing access key ID; please supply one with -I')
         if not self.args.get('secret_key'):
-            raise AuthError('missing secret key')
+            raise AuthError('missing secret key; please supply one with -S')
 
     def configure_from_aws_credential_file(self):
         if 'AWS_CREDENTIAL_FILE' in os.environ:
