@@ -26,9 +26,10 @@ try:
 except ImportError:
     import pdb
 
-from . import __version__, Arg, MutuallyExclusiveArgList
+from . import Arg, MutuallyExclusiveArgList
 from .config import Config
 from .logging import configure_root_logger
+from .suite import RequestBuilder
 from .util import aggregate_subclass_fields
 
 class BaseCommand(object):
@@ -63,11 +64,13 @@ class BaseCommand(object):
     DESCRIPTION = ''
     USAGE = None
     ARGS = []
+    SUITE = RequestBuilder
 
     def __init__(self, _do_cli=False, **kwargs):
         self.args          = kwargs
         self.config        = None  # created by _process_configfile
         self.log           = None  # created by _configure_logging
+        self.suite         = self.SUITE()
         self._arg_routes   = {}
         self._cli_parser   = None  # created by _build_parser
         self.__debug       = False
@@ -100,18 +103,14 @@ class BaseCommand(object):
         # This is a property so we can return something that references self.
         return None
 
-    @property
-    def config_files(self):
-        # This list may need to be computed on the fly.
-        return []
-
     def _configure_logging(self):
         self.log = logging.getLogger(self.name)
         if self.debug:
             self.log.setLevel(logging.DEBUG)
 
     def _process_configfiles(self):
-        self.config = Config(self.config_files, loglevel=self.log.level)
+        config_files = self.suite.list_config_files()
+        self.config = Config(config_files, loglevel=self.log.level)
         # Now that we have a config file we should check to see if it wants
         # us to turn on debugging
         if self.__config_enables_debugging():
@@ -186,7 +185,7 @@ class BaseCommand(object):
             self.__debug = True
             sys.excepthook = _debugger_except_hook
         if cli_args.get('_version', False):
-            self.print_version_and_exit()
+            self.suite.print_version_and_exit()
         # Everything goes in self.args.  distribute_args() also puts them
         # elsewhere later on in the process.
         self.args.update(cli_args)
@@ -266,11 +265,6 @@ class BaseCommand(object):
         if self.debug:
             raise
         sys.exit(1)
-
-    @staticmethod
-    def print_version_and_exit():
-        print >> sys.stderr, 'requestbuilder {0} (Prelude)'.format(__version__)
-        sys.exit()
 
     def __config_enables_debugging(self):
         if self.config is None:

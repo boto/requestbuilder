@@ -20,11 +20,11 @@ import platform
 import sys
 import textwrap
 
-from . import __version__, EMPTY
+from . import EMPTY
 from .command import BaseCommand
 from .exceptions import ClientError, ServerError
 from .service import BaseService
-from .util import aggregate_subclass_fields, get_default_user_agent
+from .util import aggregate_subclass_fields
 from .xmlparse import parse_listdelimited_aws_xml
 
 class BaseRequest(BaseCommand):
@@ -85,8 +85,6 @@ class BaseRequest(BaseCommand):
         # HTTP response obtained from the server
         self.response = None
 
-        self.__user_agent = None
-
         BaseCommand.__init__(self, **kwargs)
 
     def _post_init(self):
@@ -119,15 +117,6 @@ class BaseRequest(BaseCommand):
         return self.NAME or self.__class__.__name__
 
     @property
-    def user_agent(self):
-        '''
-        Return a user-agent string for this program.
-        '''
-        if not self.__user_agent:
-            self.__user_agent = get_default_user_agent()
-        return self.__user_agent
-
-    @property
     def status(self):
         if self.response is not None:
             return self.response.status
@@ -136,7 +125,7 @@ class BaseRequest(BaseCommand):
 
     def send(self):
         headers = dict(self.headers or {})
-        headers.setdefault('User-Agent', self.user_agent)
+        headers.setdefault('User-Agent', self.suite.get_user_agent())
         params  = self.prepare_params()
         try:
             self.response = self.service.send_request(method=self.method,
