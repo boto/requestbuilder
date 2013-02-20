@@ -19,15 +19,10 @@ import itertools
 import logging
 
 class Config(object):
-    def __init__(self, filenames, log=None):
-        if log:
-            # Yes, service.log.getChild is shorter, but it was added in 2.7.
-            if log is logging.root:
-                self.log = logging.getChild('config')
-            else:
-                self.log = logging.getLogger('{0}.config'.format(log.name))
-        else:
-            self.log = _FakeLogger()
+    def __init__(self, filenames, loglevel=None):
+        self.log = logging.getLogger(self.__class__.__name__)
+        if loglevel is not None:
+            self.log.level = loglevel
         self.globals = {}
         self.regions = {}
         self.users   = {}
@@ -205,14 +200,6 @@ class Config(object):
                             repr(section), ', '.join(map(repr, matches))))
         self.log.info('option %s not found', repr(option))
         return memoize(None)
-
-
-class _FakeLogger(object):
-    def fake_method(self, *args, **kwargs):
-        pass
-
-    def __getattribute__(self, name):
-        return object.__getattribute__(self, 'fake_method')
 
 
 def convert_to_bool(value, default=None):

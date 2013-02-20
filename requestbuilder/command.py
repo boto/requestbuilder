@@ -113,7 +113,7 @@ class BaseCommand(object):
             self.log.setLevel(logging.DEBUG)
 
     def _process_configfiles(self):
-        self.config = Config(self.config_files, log=self.log)
+        self.config = Config(self.config_files, loglevel=self.log.level)
         # Now that we have a config file we should check to see if it wants
         # us to turn on debugging
         if self.__config_enables_debugging():
