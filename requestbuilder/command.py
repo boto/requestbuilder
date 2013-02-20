@@ -206,7 +206,16 @@ class BaseCommand(object):
         try:
             cmd = cls(_do_cli=True)
         except Exception as err:
-            print >> sys.stderr, 'error:', err.message
+            if isinstance(err, EnvironmentError):
+                # These don't have regular 'message' attributes, and they occur
+                # frequently enough they we handle them specially.
+                if hasattr(err, 'filename'):
+                    print >> sys.stderr, 'error:', err.strerror + ':', \
+                        err.filename
+                else:
+                    print >> sys.stderr, 'error:', err.strerror
+            else:
+                print >> sys.stderr, 'error:', err.message or str(err)
             # Since we don't even have a config file to consult our options for
             # determining when debugging is on are limited to what we got at
             # the command line.

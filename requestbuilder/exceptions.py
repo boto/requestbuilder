@@ -57,5 +57,7 @@ class ServerError(Exception):
         return self.response.text or ''
 
     def __str__(self):
-        return '({code}) {msg}'.format(code=self.status_code,
-                                       msg=(self.message or ''))
+        s_bits = [self.__class__.__name__ + ':', self.status_code]
+        if self.message:
+            s_bits.append(self.message)
+        return ' '.join(s_bits)
