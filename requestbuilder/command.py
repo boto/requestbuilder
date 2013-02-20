@@ -173,6 +173,11 @@ class BaseCommand(object):
             for group_arg in arglike_obj:
                 args.extend(self.__add_arg_to_cli_parser(group_arg, exgroup))
             return args
+        elif isinstance(arglike_obj, list) or isinstance(arglike_obj, tuple):
+            args = []
+            for group_arg in arglike_obj:
+                args.extend(self.__add_arg_to_cli_parser(group_arg, parser))
+            return args
         else:
             raise TypeError('Unknown argument type ' +
                             arglike_obj.__class__.__name__)
