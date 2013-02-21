@@ -12,19 +12,48 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
 # OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-from distutils.core import setup
+from distutils.command.sdist import sdist
+import os.path
+
+try:
+    from setuptools import setup
+    extra = {'install_requires': ['requests', 'six']}
+except ImportError:
+    from distutils.core import setup
+    extra = {}
 
 from requestbuilder import __version__
+
+
+class sdist_with_git_version(sdist):
+    '''Like sdist, but also hardcoding the version in __init__.__version__ so
+       it's consistent even outside of the source tree'''
+
+    def make_release_tree(self, base_dir, files):
+        sdist.make_release_tree(self, base_dir, files)
+        version_line = "__version__ = '{0}'\n".format(__version__)
+        old_init_name = os.path.join(base_dir, 'requestbuilder/__init__.py')
+        new_init_name = old_init_name + '.new'
+        with open(new_init_name, 'w') as new_init:
+            with open(old_init_name) as old_init:
+                for line in old_init:
+                    if line.startswith('__version__ ='):
+                        new_init.write(version_line)
+                    else:
+                        new_init.write(line)
+            new_init.flush()
+        os.rename(new_init_name, old_init_name)
+
 
 setup(name = 'requestbuilder',
       version = __version__,
       description = 'Command line-driven HTTP request builder',
       author = 'Garrett Holmstrom (gholms)',
-      author_email = 'gholms@fedoraproject.org',
+      author_email = 'gholms@devzero.com',
       packages = ['requestbuilder'],
       license = 'ISC',
       platforms = 'Posix; MacOS X',
-      classifiers = ['Development Status :: 2 - Pre-Alpha',
+      classifiers = ['Development Status :: 3 - Alpha',
                      'Intended Audience :: Developers',
                      'License :: OSI Approved :: ISC License (ISCL)',
                      'Programming Language :: Python',
@@ -32,5 +61,7 @@ setup(name = 'requestbuilder',
                      'Programming Language :: Python :: 2.6',
                      'Programming Language :: Python :: 2.7',
                      'Topic :: Internet'],
-      requires = ['boto (>= 2.2)'],
-      provides = ['requestbuilder'])
+      requires = ['requests', 'six'],
+      provides = ['requestbuilder'],
+      cmdclass = {'sdist': sdist_with_git_version},
+      **extra)

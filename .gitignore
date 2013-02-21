@@ -6,5 +6,9 @@
 .DS_Store
 core
 core.*
+*.egg_info
 *.pyc
 *.pyo
+__pycache__
+/build
+/dist
