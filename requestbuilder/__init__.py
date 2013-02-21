@@ -18,7 +18,7 @@ import os.path
 import subprocess
 
 
-__version__ = 'devel'
+__version__ = '0.1.0-alpha1'
 
 if '__file__' in globals():
     # Check if this is a git repo; maybe we can get more precise version info
