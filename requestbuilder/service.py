@@ -156,16 +156,16 @@ class BaseService(object):
 
                 self.log.info('sending request (attempt %i of %i)', attempt_no,
                               max_tries)
-                request = requests.Request(method=method, url=url,
-                                           params=params, data=data,
-                                           headers=headers,
-                                           allow_redirects=True)
                 # Requests 1 gives auth handlers PreparedRequests instead of the
                 # original Requests like version 0 does.  Since most of our auth
                 # handlers inspect and/or modify things that aren't headers, we
-                # manually apply auth to it here to make things less painful.
-                self.auth(request)
+                # manually apply auth to it in this method to make things less
+                # painful.
                 if requests.__version__ >= '1.0':
+                    request = requests.Request(method=method, url=url,
+                                               params=params, data=data,
+                                               headers=headers)
+                    self.auth(request)
                     # A prepared request gives us extra info we want to log
                     p_request = request.prepare()
                     p_request.hooks = {'response': hooks['response']}
@@ -188,6 +188,11 @@ class BaseService(object):
                             self.log.debug('request data:   %s: %s', key, val)
                     response = self.session.send(p_request)
                 else:
+                    request = requests.Request(method=method, url=url,
+                                               params=params, data=data,
+                                               headers=headers,
+                                               allow_redirects=True)
+                    self.auth(request)
                     request.session = self.session
                     # A hook lets us log all the info that requests adds right
                     # before sending
