@@ -210,11 +210,11 @@ class BaseService(object):
         except requests.exceptions.ConnectionError as exc:
             raise ClientError('connection error')
         except requests.exceptions.HTTPError as exc:
-            return self.handle_http_error(response, exc)
+            return self.handle_http_error(response)
         except requests.exceptions.RequestException as exc:
             raise ClientError(exc)
 
-    def handle_http_error(self, response, err):
+    def handle_http_error(self, response):
         raise ServerError(response)
 
 
