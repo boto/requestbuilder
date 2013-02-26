@@ -24,7 +24,7 @@ import time
 import urlparse
 import weakref
 
-from .exceptions import ClientError, ServiceInitError
+from .exceptions import ClientError, ServerError, ServiceInitError
 from .util import aggregate_subclass_fields
 
 
