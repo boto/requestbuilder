@@ -125,7 +125,7 @@ class BaseCommand(object):
                                    for para in self.DESCRIPTION.split('\n\n')])
         parser = argparse.ArgumentParser(description=description,
                 formatter_class=argparse.RawDescriptionHelpFormatter,
-                usage=self.USAGE)
+                usage=self.USAGE, add_help=False)
         arg_objs = self.collect_arg_objs()
         self.preprocess_arg_objs(arg_objs)
         self.populate_parser(parser, arg_objs)
@@ -140,6 +140,14 @@ class BaseCommand(object):
         parser.add_argument('--version', action='store_true', dest='_version',
                             default=argparse.SUPPRESS,
                             help="show the program's version and exit")
+        if any('-h' in arg_obj.pargs for arg_obj in arg_objs):
+            parser.add_argument('--help', action='help',
+                                default=argparse.SUPPRESS,
+                                help='show this help message and exit')
+        else:
+            parser.add_argument('-h', '--help', action='help',
+                                default=argparse.SUPPRESS,
+                                help='show this help message and exit')
         self._cli_parser = parser
 
     def collect_arg_objs(self):
