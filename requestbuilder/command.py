@@ -140,7 +140,8 @@ class BaseCommand(object):
         parser.add_argument('--version', action='store_true', dest='_version',
                             default=argparse.SUPPRESS,
                             help="show the program's version and exit")
-        if any('-h' in arg_obj.pargs for arg_obj in arg_objs):
+        if any('-h' in arg_obj.pargs for arg_obj in arg_objs
+               if isinstance(arg_obj, Arg)):
             parser.add_argument('--help', action='help',
                                 default=argparse.SUPPRESS,
                                 help='show this help message and exit')
