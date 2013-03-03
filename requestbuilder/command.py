@@ -276,7 +276,15 @@ class BaseCommand(object):
         return False
 
     def handle_cli_exception(self, err):
-        print >> sys.stderr, 'error:', err.message
+        if isinstance(err, EnvironmentError):
+            # These don't have regular 'message' attributes, and they occur
+            # frequently enough they we handle them specially.
+            if hasattr(err, 'filename'):
+                print >> sys.stderr, 'error:', err.strerror + ':', err.filename
+            else:
+                print >> sys.stderr, 'error:', err.strerror
+        else:
+            print >> sys.stderr, 'error:', err.message or str(err)
         if self.debug:
             raise
         sys.exit(1)
