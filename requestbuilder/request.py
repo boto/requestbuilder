@@ -67,7 +67,7 @@ class BaseRequest(BaseCommand):
     NAME          = None
     METHOD        = 'GET'
 
-    LIST_MARKERS = []
+    LIST_TAGS = []
 
 
     def __init__(self, service=None, **kwargs):
@@ -231,7 +231,7 @@ class AWSQueryRequest(BaseRequest):
     def parse_response(self, response):
         # Parser for list-delimited responses like EC2's
         response_dict = self.log_and_parse_response(response,
-                parse_listdelimited_aws_xml, list_markers=self.LIST_MARKERS)
+                parse_listdelimited_aws_xml, list_tags=self.LIST_TAGS)
         # Strip off the root element
         assert len(response_dict) == 1
         return response_dict[list(response_dict.keys())[0]]

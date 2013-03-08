@@ -18,14 +18,14 @@ except ImportError:
     from xml.etree import ElementTree
 
 
-def parse_aws_xml(xml_stream, list_item_markers=None):
+def parse_aws_xml(xml_stream, list_item_tags=None):
     '''
     Parse a stream of XML and return a nested dict.  The dict represents each
     XML element with a key that matches the element's name and a value of
     another dict if the element contains at least one child element, or the
     element's text if it does not.
 
-    For each element whose name appears in the list_item_markers list, its dict
+    For each element whose name appears in the list_item_tags list, its dict
     value will instead be a list that aggregates the values of every element
     with that name.
 
@@ -46,8 +46,8 @@ def parse_aws_xml(xml_stream, list_item_markers=None):
     '''
     # One fundamental assumption we make here is that elements contain text
     # xor other elements.
-    if list_item_markers is None:
-        list_item_markers = ()
+    if list_item_tags is None:
+        list_item_tags = ()
     stack = [(None, {})]
     try:
         for event, elem in ElementTree.iterparse(xml_stream,
@@ -56,7 +56,7 @@ def parse_aws_xml(xml_stream, list_item_markers=None):
             if event == 'start':
                 stack.append((tag, {}))
             if event == 'end':
-                if tag in list_item_markers:
+                if tag in list_item_tags:
                     # We're ending a list item, so append it to stack[-2]'s list
                     stack[-2][1].setdefault(tag, [])
                     if stack[-1][1] == {}:
@@ -77,14 +77,14 @@ def parse_aws_xml(xml_stream, list_item_markers=None):
     return stack[0][1]
 
 
-def parse_listdelimited_aws_xml(xml_stream, list_markers=None):
+def parse_listdelimited_aws_xml(xml_stream, list_tags=None):
     '''
     Parse a stream of XML and return a nested dict.  The dict represents each
     XML element with a key that matches the element's name and a value of
     another dict if the element contains at least one child element, or the
     element's text if it does not.
 
-    For each element whose name appears in the list_markers list, its dict
+    For each element whose name appears in the list_tags list, its dict
     value will instead be a list that aggregates the values of each of that
     element's children.
 
@@ -105,15 +105,15 @@ def parse_listdelimited_aws_xml(xml_stream, list_markers=None):
     '''
     # One fundamental assumption we make here is that elements contain text
     # xor other elements.
-    if list_markers is None:
-        list_markers = ()
+    if list_tags is None:
+        list_tags = ()
     stack = [(None, {})]
     try:
         for event, elem in ElementTree.iterparse(xml_stream,
                                                  events=('start', 'end')):
             tag = _strip_tag(elem.tag)
             if event == 'start':
-                if tag in list_markers:
+                if tag in list_tags:
                     # Start a new list
                     stack.append((tag, []))
                 else:
