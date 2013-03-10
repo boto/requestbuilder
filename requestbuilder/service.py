@@ -15,6 +15,7 @@
 from __future__ import absolute_import
 
 import copy
+import datetime
 import functools
 import logging
 import os.path
@@ -186,6 +187,7 @@ class BaseService(object):
                             if key.lower().endswith('password'):
                                 val = '<redacted>'
                             self.log.debug('request data:   %s: %s', key, val)
+                    p_request.start_time = datetime.datetime.now()
                     response = self.session.send(p_request)
                 else:
                     request = requests.Request(method=method, url=url,
@@ -197,6 +199,7 @@ class BaseService(object):
                     # A hook lets us log all the info that requests adds right
                     # before sending
                     request.hooks = hooks
+                    request.start_time = datetime.datetime.now()
                     request.send()
                     response = request.response
                 if response.status_code not in (500, 503):
@@ -240,6 +243,9 @@ def _log_request_data(logger, request):
 
 
 def _log_response_data(logger, response):
+    duration = datetime.datetime.now() - response.request.start_time
+    logger.debug('response time: %i.%03i seconds', duration.seconds,
+                 duration.microseconds // 1000)
     if response.status_code >= 400:
         logger.error('response status: %i', response.status_code)
     else:
