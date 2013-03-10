@@ -320,31 +320,29 @@ class AWSQueryRequest(BaseRequest):
             # Performance optimization
             return ''
 
-        # FIXME:  This code has a bug with triple-quoted strings that contain
-        #         embedded indentation.  textwrap.dedent doesn't seem to help.
-        #         Reproducer: 'whether the   volume will be deleted'
-        max_len = 24
-        col_len = max([len(filter_obj.name) for filter_obj in self.FILTERS
-                       if len(filter_obj.name) < max_len]) - 1
         helplines = ['allowed filter names:']
         for filter_obj in self.FILTERS:
             if filter_obj.help:
-                if len(filter_obj.name) <= col_len:
-                    # filter-name    Description of the filter that
-                    #                continues on the next line
-                    right_space = ' ' * (max_len - len(filter_obj.name) - 2)
-                    wrapper = textwrap.TextWrapper(fix_sentence_endings=True,
-                        initial_indent=('  ' + filter_obj.name + right_space),
-                        subsequent_indent=(' ' * max_len))
+                first, __, rest = filter_obj.help.partition('\n')
+                if rest.startswith(' ') and not first.startswith(' '):
+                    # First line is not uniformly indented
+                    content = first + ' ' + textwrap.dedent(rest)
                 else:
-                    # really-long-filter-name
-                    #                Description that begins on the next line
+                    content = filter_obj.help
+                if len(filter_obj.name) <= 20:
+                    # Short name; start on same line and pad two spaces
+                    firstline = '  {0:<20}  '.format(filter_obj.name)
+                    wrapper = textwrap.TextWrapper(fix_sentence_endings=True,
+                        initial_indent=firstline, subsequent_indent=(' ' * 24))
+                else:
+                    # Long name; start on next line
                     helplines.append('  ' + filter_obj.name)
                     wrapper = textwrap.TextWrapper(fix_sentence_endings=True,
-                            initial_indent=(   ' ' * max_len),
-                            subsequent_indent=(' ' * max_len))
-                helplines.extend(wrapper.wrap(filter_obj.help))
+                        initial_indent=(' ' * 24),
+                        subsequent_indent=(' ' * 24))
+                helplines.extend(wrapper.wrap(content))
             else:
+                # No help; everything goes on one line
                 helplines.append('  ' + filter_obj.name)
         return '\n'.join(helplines)
 
