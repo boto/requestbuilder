@@ -24,7 +24,7 @@ import textwrap
 
 from . import EMPTY
 from .command import BaseCommand
-from .exceptions import ClientError, ServerError
+from .exceptions import ServerError
 from .service import BaseService
 from .util import aggregate_subclass_fields
 from .xmlparse import parse_listdelimited_aws_xml
