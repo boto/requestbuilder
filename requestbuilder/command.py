@@ -217,6 +217,7 @@ class BaseCommand(object):
             self.suite.print_version_and_exit()
         # Everything goes in self.args.  distribute_args() also puts them
         # elsewhere later on in the process.
+        self.log.debug('Parsed arguments: ' + str(cli_args))
         self.args.update(cli_args)
 
     def distribute_args(self):
