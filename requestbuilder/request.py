@@ -17,6 +17,7 @@ from __future__ import absolute_import
 import argparse
 from functools import partial
 import logging
+import os.path
 import platform
 import sys
 import textwrap
@@ -185,8 +186,9 @@ class BaseRequest(BaseCommand):
 
     def handle_cli_exception(self, err):
         if isinstance(err, ServerError):
-            print >> sys.stderr, 'error ({0}): {1}'.format(
+            msg = '{0}: error ({1}): {2}'.format(os.path.basename(sys.argv[0]),
                 getattr(err, 'code', err.status_code), err.message)
+            print >> sys.stderr, msg
             if self.debug:
                 raise
             sys.exit(1)

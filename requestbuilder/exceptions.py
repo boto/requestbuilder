@@ -13,6 +13,12 @@
 # OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 
+class ArgumentError(TypeError):
+    '''
+    A bad command line argument should cause the command to fail
+    '''
+
+
 class ClientError(Exception):
     '''
     General client error (e.g. error accessing the server)

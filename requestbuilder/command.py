@@ -17,6 +17,7 @@ from __future__ import absolute_import
 import argparse
 import bdb
 import logging
+import os.path
 import sys
 import textwrap
 import traceback
@@ -28,6 +29,7 @@ except ImportError:
 
 from . import Arg, MutuallyExclusiveArgList
 from .config import Config
+from .exceptions import ArgumentError
 from .logging import configure_root_logger
 from .suite import RequestBuilder
 from .util import aggregate_subclass_fields
@@ -94,7 +96,22 @@ class BaseCommand(object):
             # Distribute CLI args to the various places that need them
             self.process_cli_args()
         self.distribute_args()
-        self.configure()
+        try:
+            self.configure()
+        except ArgumentError as err:
+            if self.__do_cli and not self.__debug:
+                # This is the only context in which we have a parser object,
+                # so if we don't handle this here and now the caller will have
+                # to handle it without one, which means no usage info for the
+                # user.
+                #
+                # This is contingent on self.__debug and not self.debug because
+                # run(), having no idea whether the config enables debugging or
+                # not, is going to terminate the program anyway regardless of
+                # that.
+                self._cli_parser.error(str(err))
+            else:
+                raise
 
     @property
     def default_route(self):
@@ -225,16 +242,17 @@ class BaseCommand(object):
         try:
             cmd = cls(_do_cli=True)
         except Exception as err:
+            msg_prefix = '{0}: error:'.format(os.path.basename(sys.argv[0]))
             if isinstance(err, EnvironmentError):
                 # These don't have regular 'message' attributes, and they occur
                 # frequently enough they we handle them specially.
                 if hasattr(err, 'filename'):
-                    print >> sys.stderr, 'error:', err.strerror + ':', \
+                    print >> sys.stderr, msg_prefix, err.strerror + ':', \
                         err.filename
                 else:
-                    print >> sys.stderr, 'error:', err.strerror
+                    print >> sys.stderr, msg_prefix, err.strerror
             else:
-                print >> sys.stderr, 'error:', err.message or str(err)
+                print >> sys.stderr, msg_prefix, err.message or str(err)
             # Since we don't even have a config file to consult our options for
             # determining when debugging is on are limited to what we got at
             # the command line.
@@ -276,15 +294,17 @@ class BaseCommand(object):
         return False
 
     def handle_cli_exception(self, err):
+        msg_prefix = '{0}: error:'.format(os.path.basename(sys.argv[0]))
         if isinstance(err, EnvironmentError):
             # These don't have regular 'message' attributes, and they occur
             # frequently enough they we handle them specially.
             if hasattr(err, 'filename'):
-                print >> sys.stderr, 'error:', err.strerror + ':', err.filename
+                print >> sys.stderr, msg_prefix, err.strerror + ':', \
+                    err.filename
             else:
-                print >> sys.stderr, 'error:', err.strerror
+                print >> sys.stderr, msg_prefix, err.strerror
         else:
-            print >> sys.stderr, 'error:', err.message or str(err)
+            print >> sys.stderr, msg_prefix, err.message or str(err)
         if self.debug:
             raise
         sys.exit(1)
