@@ -97,10 +97,10 @@ class HmacKeyAuth(BaseAuth):
                     line = line.split('#', 1)[0]
                     if '=' in line:
                         (key, val) = line.split('=', 1)
-                        if key.strip() == 'AWSAccessKeyId':
-                            self.args.setdefault('key_id', val.strip())
-                        elif key.strip() == 'AWSSecretKey':
-                            self.args.setdefault('secret_key', val.strip())
+                        if key.strip() == 'AWSAccessKeyId' and not self.args.get('key_id'):
+                            self.args['key_id'] = val.strip()
+                        elif key.strip() == 'AWSSecretKey' and not self.args.get('secret_key'):
+                            self.args['secret_key'] = val.strip()
 
     def configure_from_configfile(self):
         if not self.args.get('key_id'):
