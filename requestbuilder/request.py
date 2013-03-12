@@ -104,6 +104,7 @@ class BaseRequest(BaseCommand):
         self.service.preprocess_arg_objs(arg_objs)
 
     def configure(self):
+        BaseCommand.configure(self)
         self.service.configure()
 
     @property
