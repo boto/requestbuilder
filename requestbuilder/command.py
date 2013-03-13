@@ -219,7 +219,8 @@ class BaseCommand(object):
         # elsewhere later on in the process.
         self.args.update(cli_args)
         for key in list(cli_args.keys()):
-            if 'password' in key.lower() or 'secret' in key.lower():
+            if (('password' in key.lower() or 'secret' in key.lower()) and
+                cli_args[key] is not None):
                 # This makes it slightly more obvious that this is redacted by
                 # the framework and not just a string by removing quotes.
                 cli_args[key] = type('REDACTED', (),
