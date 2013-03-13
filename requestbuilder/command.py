@@ -217,8 +217,14 @@ class BaseCommand(object):
             self.suite.print_version_and_exit()
         # Everything goes in self.args.  distribute_args() also puts them
         # elsewhere later on in the process.
-        self.log.debug('Parsed arguments: ' + str(cli_args))
         self.args.update(cli_args)
+        for key in list(cli_args.keys()):
+            if 'password' in key.lower() or 'secret' in key.lower():
+                # This makes it slightly more obvious that this is redacted by
+                # the framework and not just a string by removing quotes.
+                cli_args[key] = type('REDACTED', (),
+                    {'__repr__': lambda self: '<redacted>'})()
+        self.log.debug('parsed arguments: ' + str(cli_args))
 
     def distribute_args(self):
         for key, val in self.args.iteritems():
