@@ -302,6 +302,10 @@ class BaseCommand(object):
 
     def handle_cli_exception(self, err):
         msg_prefix = '{0}: error:'.format(os.path.basename(sys.argv[0]))
+        if isinstance(err, ArgumentError) and self.__do_cli and not self.debug:
+            # Note that, unlike _post_init, we get to use self.debug instead
+            # of self.__debug
+            self._cli_parser.error(str(err))
         if isinstance(err, EnvironmentError):
             # These don't have regular 'message' attributes, and they occur
             # frequently enough they we handle them specially.
