@@ -217,9 +217,13 @@ class AWSQueryRequest(BaseRequest):
             self.args['Filter'] = _process_filters(self.args.pop('filters'))
             self._arg_routes['Filter'] = self.params
 
+    @property
+    def action(self):
+        return self.name
+
     def prepare_params(self):
         params = self.flatten_params(self.params)
-        params['Action'] = self.name
+        params['Action'] = self.action
         params['Version'] = self.API_VERSION or self.service.API_VERSION
         redacted_params = dict(params)
         for key in params:
