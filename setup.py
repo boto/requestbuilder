@@ -18,10 +18,8 @@ import os.path
 
 try:
     from setuptools import setup
-    extra = {'install_requires': ['requests', 'six']}
 except ImportError:
     from distutils.core import setup
-    extra = {}
 
 from requestbuilder import __version__
 
@@ -84,8 +82,5 @@ setup(name = 'requestbuilder',
                      'Programming Language :: Python :: 2.6',
                      'Programming Language :: Python :: 2.7',
                      'Topic :: Internet'],
-      requires = ['requests', 'six'],
-      provides = ['requestbuilder'],
       cmdclass = {'build_py': build_py_with_git_version,
-                  'sdist': sdist_with_git_version},
-      **extra)
+                  'sdist': sdist_with_git_version})
