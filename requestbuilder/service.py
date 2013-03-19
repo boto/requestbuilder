@@ -100,7 +100,8 @@ class BaseService(object):
 
     def validate_config(self):
         if self.endpoint is None:
-            regions = ', '.join(sorted(self.config.regions.keys()))
+            regions = ', '.join(sorted(filter(lambda s: '*' not in s,
+                                              self.config.regions.keys())))
             errmsg = ('no {0} endpoint to connect to was given'
                       .format(self.NAME))
             if regions:
