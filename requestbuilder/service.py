@@ -101,7 +101,8 @@ class BaseService(object):
     def validate_config(self):
         if self.endpoint is None:
             regions = ', '.join(sorted(self.config.regions.keys()))
-            errmsg = 'no endpoint to connect to was given'
+            errmsg = ('no {0} endpoint to connect to was given'
+                      .format(self.NAME))
             if regions:
                 errmsg += '.  Known regions are ' + regions
             raise ServiceInitError(errmsg)
