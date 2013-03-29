@@ -82,5 +82,10 @@ setup(name = 'requestbuilder',
                      'Programming Language :: Python :: 2.6',
                      'Programming Language :: Python :: 2.7',
                      'Topic :: Internet'],
+      install_requires=[
+          "requests",
+          "argparse",
+          "six",
+      ],
       cmdclass = {'build_py': build_py_with_git_version,
                   'sdist': sdist_with_git_version})
