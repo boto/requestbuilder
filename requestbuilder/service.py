@@ -100,20 +100,27 @@ class BaseService(object):
 
     def validate_config(self):
         if self.endpoint is None:
-            regions = ', '.join(sorted(filter(lambda s: '*' not in s,
-                                              self.config.regions.keys())))
-            errmsg = ('no {0} endpoint to connect to was given'
-                      .format(self.NAME))
-            if regions:
-                errmsg += '.  Known regions are ' + regions
-            raise ServiceInitError(errmsg)
+            url_opt = '{0}-url'.format(self.NAME)
+            available_regions = []
+            for rname, rconfig in self.config.regions.iteritems():
+                if url_opt in rconfig and '*' not in rname:
+                    available_regions.append(rname)
+            if len(available_regions) > 0:
+                msg = ('No {0} endpoint to connect to was given. Configured '
+                       'regions with {0} endpoints are: {1}').format(
+                    self.NAME, ', '.join(sorted(available_regions)))
+            else:
+                msg = ('No {0} endpoint to connect to was given. {0} '
+                       'endpoints may be specified in a config file with '
+                       '"{1}".').format(self.NAME, url_opt)
+            raise ServiceInitError(msg)
 
     def process_url(self, url):
         if url:
             if '::' in url:
                 userregion, endpoint = url.split('::', 1)
             else:
-                endpoint   = url
+                endpoint = url
                 userregion = None
             if self.endpoint is None:
                 self.endpoint = endpoint
