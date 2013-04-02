@@ -64,6 +64,6 @@ class ServerError(Exception):
 
     def __str__(self):
         s_bits = [self.__class__.__name__ + ':', self.status_code]
-        if self.message:
-            s_bits.append(self.message)
+        if len(self.args) > 0 and self.args[0]:
+            s_bits.append(self.args[0])
         return ' '.join(s_bits)

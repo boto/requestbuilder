@@ -260,7 +260,10 @@ class BaseCommand(object):
                 else:
                     print >> sys.stderr, msg_prefix, err.strerror
             else:
-                print >> sys.stderr, msg_prefix, err.message or str(err)
+                if len(err.args) > 0 and err.args[0]:
+                    print >> sys.stderr, msg_prefix, err.args[0]
+                else:
+                    print >> sys.stderr, msg_prefix, str(err)
             # Since we don't even have a config file to consult our options for
             # determining when debugging is on are limited to what we got at
             # the command line.
@@ -316,7 +319,10 @@ class BaseCommand(object):
             else:
                 print >> sys.stderr, msg_prefix, err.strerror
         else:
-            print >> sys.stderr, msg_prefix, err.message or str(err)
+            if len(err.args) > 0 and err.args[0]:
+                print >> sys.stderr, msg_prefix, err.args[0]
+            else:
+                print >> sys.stderr, msg_prefix, str(err)
         if self.debug:
             raise
         sys.exit(1)

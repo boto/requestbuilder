@@ -187,8 +187,12 @@ class BaseRequest(BaseCommand):
 
     def handle_cli_exception(self, err):
         if isinstance(err, ServerError):
+            if len(err.args) > 0 and err.args[0]:
+                err_description = err.args[0]
+            else:
+                err_description = str(err)
             msg = '{0}: error ({1}): {2}'.format(os.path.basename(sys.argv[0]),
-                getattr(err, 'code', err.status_code), err.message)
+                getattr(err, 'code', err.status_code), err_description)
             print >> sys.stderr, msg
             if self.debug:
                 raise
