@@ -82,7 +82,7 @@ setup(name = 'requestbuilder',
                      'Programming Language :: Python :: 2.6',
                      'Programming Language :: Python :: 2.7',
                      'Topic :: Internet'],
-      install_requires=[
+      install_requires = [
           "requests",
           "argparse",
           "six",
