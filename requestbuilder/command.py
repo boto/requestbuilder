@@ -254,11 +254,13 @@ class BaseCommand(object):
             if isinstance(err, EnvironmentError):
                 # These don't have regular 'message' attributes, and they occur
                 # frequently enough they we handle them specially.
-                if hasattr(err, 'filename'):
-                    print >> sys.stderr, msg_prefix, err.strerror + ':', \
-                        err.filename
-                else:
-                    print >> sys.stderr, msg_prefix, err.strerror
+                err_bits = [msg_prefix]
+                if getattr(err, 'strerror', None):
+                    err_bits.append(err.strerror)
+                if getattr(err, 'filename', None):
+                    err_bits[-1] += ':'
+                    err_bits.append(err.filename)
+                print >> sys.stderr, ' '.join(err_bits)
             else:
                 if len(err.args) > 0 and err.args[0]:
                     print >> sys.stderr, msg_prefix, err.args[0]
@@ -313,11 +315,13 @@ class BaseCommand(object):
         if isinstance(err, EnvironmentError):
             # These don't have regular 'message' attributes, and they occur
             # frequently enough they we handle them specially.
-            if hasattr(err, 'filename'):
-                print >> sys.stderr, msg_prefix, err.strerror + ':', \
-                    err.filename
-            else:
-                print >> sys.stderr, msg_prefix, err.strerror
+            err_bits = [msg_prefix]
+            if getattr(err, 'strerror', None):
+                err_bits.append(err.strerror)
+            if getattr(err, 'filename', None):
+                err_bits[-1] += ':'
+                err_bits.append(err.filename)
+            print >> sys.stderr, ' '.join(err_bits)
         else:
             if len(err.args) > 0 and err.args[0]:
                 print >> sys.stderr, msg_prefix, err.args[0]
