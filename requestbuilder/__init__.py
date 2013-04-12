@@ -50,8 +50,11 @@ class Arg(object):
 
     def __init__(self, *pargs, **kwargs):
         if 'route_to' in kwargs:
-            self.route  = kwargs.pop('route_to')
-        self.pargs  = pargs
+            if isinstance(kwargs['route_to'], (list, set, tuple)):
+                self.routes = tuple(kwargs.pop('route_to'))
+            else:
+                self.routes = (kwargs.pop('route_to'),)
+        self.pargs = pargs
         self.kwargs = kwargs
 
     def __eq__(self, other):

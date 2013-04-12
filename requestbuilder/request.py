@@ -213,13 +213,13 @@ class AWSQueryRequest(BaseRequest):
                     help='restrict results to those that meet criteria',
                     type=partial(_parse_filter, filter_objs=self.FILTERS))
             parser.epilog = self.__build_filter_help()
-            self._arg_routes['filters'] = None
+            self._arg_routes['filters'] = (None,)
 
     def process_cli_args(self):
         BaseRequest.process_cli_args(self)
         if 'filters' in self.args:
             self.args['Filter'] = _process_filters(self.args.pop('filters'))
-            self._arg_routes['Filter'] = self.params
+            self._arg_routes['Filter'] = (self.params,)
 
     @property
     def action(self):

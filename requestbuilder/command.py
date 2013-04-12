@@ -71,7 +71,7 @@ class BaseCommand(object):
         self.config        = None  # created by _process_configfile
         self.log           = None  # created by _configure_logging
         self.suite         = self.SUITE()
-        self._arg_routes   = {}
+        self._arg_routes   = {}  # arg name -> tuple of callables or dicts
         self._cli_parser   = None  # created by _build_parser
         self.__debug       = False
 
@@ -187,8 +187,8 @@ class BaseCommand(object):
             else:
                 arg = parser.add_argument(*arglike_obj.pargs,
                                           **arglike_obj.kwargs)
-                route = getattr(arglike_obj, 'route', self.default_route)
-                self._arg_routes[arg.dest] = route
+                routes = getattr(arglike_obj, 'routes', self.default_route)
+                self._arg_routes[arg.dest] = routes
                 return [arg]
         elif isinstance(arglike_obj, MutuallyExclusiveArgList):
             exgroup = parser.add_mutually_exclusive_group(
@@ -230,15 +230,17 @@ class BaseCommand(object):
     def distribute_args(self):
         for key, val in self.args.iteritems():
             # If a location to route this to was supplied, put it there, too.
-            route = self._arg_routes[key]
-            if route is not None:
-                if callable(route):
-                    # If it's callable, call it to get the actual destination
-                    # dict.  This is needed to allow Arg objects to refer to
-                    # instance attributes from the context of the class.
-                    route = route(self)
-                # At this point we had better have a dict.
-                route[key] = val
+            routes = self._arg_routes[key]
+            for route in routes:
+                if route is not None:
+                    if callable(route):
+                        # If it's callable, call it to get the actual
+                        # destination dict.  This is needed to allow Arg
+                        # objects to refer to instance attributes from the
+                        # context of the class.
+                        route = route(self)
+                    # At this point we had better have a dict.
+                    route[key] = val
 
     def configure(self):
         # TODO:  Come up with something that can enforce arg constraints based
