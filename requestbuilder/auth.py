@@ -100,9 +100,14 @@ class HmacKeyAuth(BaseAuth):
                     line = line.split('#', 1)[0]
                     if '=' in line:
                         (key, val) = line.split('=', 1)
-                        if key.strip() == 'AWSAccessKeyId' and not self.args.get('key_id'):
+                        if (key.strip() == 'AWSAccessKeyId' and
+                            not self.args.get('key_id')):
+                            # There's probably a better way to do this, but it
+                            # seems to work for me.  Patches are welcome.  :)
                             self.args['key_id'] = val.strip()
-                        elif key.strip() == 'AWSSecretKey' and not self.args.get('secret_key'):
+                        elif (key.strip() == 'AWSSecretKey' and
+                            not self.args.get('secret_key')):
+                            # This space for rent
                             self.args['secret_key'] = val.strip()
 
     def configure_from_configfile(self, only_if_explicit=False):
