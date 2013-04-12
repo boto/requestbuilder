@@ -66,9 +66,9 @@ class BaseCommand(object):
     ARGS = []
     SUITE = RequestBuilder
 
-    def __init__(self, _do_cli=False, **kwargs):
+    def __init__(self, config=None, _do_cli=False, **kwargs):
         self.args          = kwargs
-        self.config        = None  # created by _process_configfile
+        self.config        = config  # created by _process_configfiles if None
         self.log           = None  # created by _configure_logging
         self.suite         = self.SUITE()
         self._arg_routes   = {}  # arg name -> tuple of callables or dicts
@@ -124,8 +124,9 @@ class BaseCommand(object):
             self.log.setLevel(logging.DEBUG)
 
     def _process_configfiles(self):
-        config_files = self.suite.list_config_files()
-        self.config = Config(config_files, loglevel=self.log.level)
+        if self.config is None:
+            config_files = self.suite.list_config_files()
+            self.config = Config(config_files, loglevel=self.log.level)
         # Now that we have a config file we should check to see if it wants
         # us to turn on debugging
         if self.__config_enables_debugging():
