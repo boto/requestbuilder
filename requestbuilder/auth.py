@@ -77,6 +77,9 @@ class HmacKeyAuth(BaseAuth):
                 route_to=AUTH)]
 
     def configure(self):
+        # If the current user/region was explicitly set (e.g. with --region),
+        # use that first
+        self.configure_from_configfile(only_if_explicit=True)
         # See if an AWS credential file was given in the environment
         self.configure_from_aws_credential_file()
         # Try the requestbuilder config file next
@@ -102,7 +105,11 @@ class HmacKeyAuth(BaseAuth):
                         elif key.strip() == 'AWSSecretKey' and not self.args.get('secret_key'):
                             self.args['secret_key'] = val.strip()
 
-    def configure_from_configfile(self):
+    def configure_from_configfile(self, only_if_explicit=False):
+        if (only_if_explicit and self.config.current_user is None and
+            self.config.current_region is None):
+            # The current user/region were not explicitly set, so do nothing.
+            return
         if not self.args.get('key_id'):
             config_key_id = self.config.get_user_option('key-id')
             if config_key_id:
