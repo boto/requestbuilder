@@ -231,7 +231,7 @@ class BaseService(object):
 
 
 # Note that the hook this is meant to run as was removed from requests 1.
-def _log_request_data(logger, request):
+def _log_request_data(logger, request, **kwargs):
     logger.debug('request method: %s', request.method)
     logger.debug('request url:    %s', request.full_url)
     if isinstance(request.headers, dict):
@@ -251,7 +251,7 @@ def _log_request_data(logger, request):
             logger.debug('request data:   %s: %s', key, val)
 
 
-def _log_response_data(logger, response):
+def _log_response_data(logger, response, **kwargs):
     duration = datetime.datetime.now() - response.request.start_time
     logger.debug('response time: %i.%03i seconds', duration.seconds,
                  duration.microseconds // 1000)
