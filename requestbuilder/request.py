@@ -91,8 +91,8 @@ class BaseRequest(BaseCommand):
         BaseCommand._post_init(self)
 
     @property
-    def default_route(self):
-        return self.params
+    def default_routes(self):
+        return [self.params]
 
     def collect_arg_objs(self):
         request_args = BaseCommand.collect_arg_objs(self)

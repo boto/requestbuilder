@@ -114,9 +114,9 @@ class BaseCommand(object):
                 raise
 
     @property
-    def default_route(self):
+    def default_routes(self):
         # This is a property so we can return something that references self.
-        return None
+        return [None]
 
     def _configure_logging(self):
         self.log = logging.getLogger(self.name)
@@ -188,7 +188,7 @@ class BaseCommand(object):
             else:
                 arg = parser.add_argument(*arglike_obj.pargs,
                                           **arglike_obj.kwargs)
-                routes = getattr(arglike_obj, 'routes', self.default_route)
+                routes = getattr(arglike_obj, 'routes', self.default_routes)
                 self._arg_routes[arg.dest] = routes
                 return [arg]
         elif isinstance(arglike_obj, MutuallyExclusiveArgList):
