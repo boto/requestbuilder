@@ -13,7 +13,7 @@
 # OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 
-class ArgumentError(TypeError):
+class ArgumentError(ValueError):
     '''
     A bad command line argument should cause the command to fail
     '''
