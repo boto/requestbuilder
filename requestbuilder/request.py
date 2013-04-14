@@ -92,7 +92,7 @@ class BaseRequest(BaseCommand):
 
     @property
     def default_routes(self):
-        return [self.params]
+        return (self.params,)
 
     def collect_arg_objs(self):
         request_args = BaseCommand.collect_arg_objs(self)

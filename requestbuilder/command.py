@@ -116,7 +116,7 @@ class BaseCommand(object):
     @property
     def default_routes(self):
         # This is a property so we can return something that references self.
-        return [None]
+        return (None,)
 
     def _configure_logging(self):
         self.log = logging.getLogger(self.name)
