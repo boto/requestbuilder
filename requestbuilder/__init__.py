@@ -54,6 +54,8 @@ class Arg(object):
                 self.routes = tuple(kwargs.pop('route_to'))
             else:
                 self.routes = (kwargs.pop('route_to'),)
+        else:
+            self.routes = None
         self.pargs = pargs
         self.kwargs = kwargs
 
@@ -80,6 +82,8 @@ class MutuallyExclusiveArgList(list):
         else:
             self.required = False
             list.__init__(self, args)
+        # This must go nowhere since it has no arg values of its own
+        self.routes = ()
 
 
 class Filter(object):

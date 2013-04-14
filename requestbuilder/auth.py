@@ -54,8 +54,16 @@ class BaseAuth(object):
             self.log = logging.getLogger('{0}.{1}'.format(
                     service.log.name, self.__class__.__name__))
 
+    @property
+    def default_routes(self):
+        return (self.args,)
+
     def collect_arg_objs(self):
-        return aggregate_subclass_fields(self.__class__, 'ARGS')
+        arg_objs = aggregate_subclass_fields(self.__class__, 'ARGS')
+        for arg_obj in arg_objs:
+            if arg_obj.routes is None:
+                arg_obj.routes = self.default_routes
+        return arg_objs
 
     def preprocess_arg_objs(self, arg_objs):
         pass
@@ -71,10 +79,8 @@ class HmacKeyAuth(BaseAuth):
     '''
     Basis for AWS HMAC-based authentication
     '''
-    ARGS = [Arg('-I', '--access-key-id', dest='key_id', metavar='KEY_ID',
-                route_to=AUTH),
-            Arg('-S', '--secret-key', dest='secret_key', metavar='KEY',
-                route_to=AUTH)]
+    ARGS = [Arg('-I', '--access-key-id', dest='key_id', metavar='KEY_ID'),
+            Arg('-S', '--secret-key', dest='secret_key', metavar='KEY')]
 
     def configure(self):
         # If the current user/region was explicitly set (e.g. with --region),

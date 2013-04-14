@@ -170,7 +170,11 @@ class BaseCommand(object):
         self._cli_parser = parser
 
     def collect_arg_objs(self):
-        return aggregate_subclass_fields(self.__class__, 'ARGS')
+        arg_objs = aggregate_subclass_fields(self.__class__, 'ARGS')
+        for arg_obj in arg_objs:
+            if arg_obj.routes is None:
+                arg_obj.routes = self.default_routes
+        return arg_objs
 
     def preprocess_arg_objs(self, arg_objs):
         pass
@@ -188,8 +192,10 @@ class BaseCommand(object):
             else:
                 arg = parser.add_argument(*arglike_obj.pargs,
                                           **arglike_obj.kwargs)
-                routes = getattr(arglike_obj, 'routes', self.default_routes)
-                self._arg_routes[arg.dest] = routes
+                if arglike_obj.routes is None:
+                    self._arg_routes[arg.dest] = (None,)
+                else:
+                    self._arg_routes[arg.dest] = arglike_obj.routes
                 return [arg]
         elif isinstance(arglike_obj, MutuallyExclusiveArgList):
             exgroup = parser.add_mutually_exclusive_group(

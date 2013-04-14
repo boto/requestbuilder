@@ -58,11 +58,18 @@ class BaseService(object):
             self.auth = None
 
     @property
+    def default_routes(self):
+        return (self.args,)
+
+    @property
     def region_name(self):
         return self.config.get_region()
 
     def collect_arg_objs(self):
         service_args = aggregate_subclass_fields(self.__class__, 'ARGS')
+        for service_arg in service_args:
+            if service_arg.routes is None:
+                service_arg.routes = self.default_routes
         if self.auth is not None:
             auth_args = self.auth.collect_arg_objs()
         else:
