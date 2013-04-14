@@ -223,7 +223,10 @@ class BaseService(object):
                 self.handle_http_error(response)
             return response
         except requests.exceptions.ConnectionError as exc:
-            raise ClientError('connection error')
+            if len(exc.args) > 0 and hasattr(exc.args[0], 'reason'):
+                raise ClientError(exc.args[0].reason)
+            else:
+                raise ClientError('connection error')
         except requests.exceptions.HTTPError as exc:
             return self.handle_http_error(response)
         except requests.exceptions.RequestException as exc:
