@@ -17,6 +17,7 @@ class ArgumentError(ValueError):
     '''
     A bad command line argument should cause the command to fail
     '''
+    pass
 
 
 class ClientError(Exception):
@@ -48,22 +49,21 @@ class ServerError(Exception):
     '''
 
     def __init__(self, response, *args):
-        Exception.__init__(self, *args)
+        Exception.__init__(self, response.status_code, response.reason, *args)
         self.response = response
 
     @property
-    def status_code(self):
-        '''
-        HTTP status code
-        '''
-        return self.response.status_code
+    def body(self):
+        return self.response.text
 
     @property
-    def body(self):
-        return self.response.text or ''
+    def reason(self):
+        return self.response.reason
 
-    def __str__(self):
-        s_bits = [self.__class__.__name__ + ':', self.status_code]
-        if len(self.args) > 0 and self.args[0]:
-            s_bits.append(self.args[0])
-        return ' '.join(s_bits)
+    @property
+    def status_code(self):
+        return self.response.status_code
+
+    def format_for_cli(self):
+        return 'error ({0}): {1}'.format(self.status_code,
+                                         self.body or self.reason)
