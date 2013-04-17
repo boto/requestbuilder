@@ -185,7 +185,8 @@ class BaseService(object):
                     request = requests.Request(method=method, url=url,
                                                params=params, data=data,
                                                headers=headers)
-                    self.auth(request)
+                    if self.auth is not None:
+                        self.auth(request)
                     # A prepared request gives us extra info we want to log
                     p_request = request.prepare()
                     p_request.hooks = {'response': hooks['response']}
@@ -213,7 +214,8 @@ class BaseService(object):
                                                params=params, data=data,
                                                headers=headers,
                                                allow_redirects=True)
-                    self.auth(request)
+                    if self.auth is not None:
+                        self.auth(request)
                     request.session = self.session
                     # A hook lets us log all the info that requests adds right
                     # before sending
