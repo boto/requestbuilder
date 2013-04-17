@@ -235,6 +235,8 @@ class BaseCommand(object):
     def distribute_args(self):
         for key, val in self.args.iteritems():
             # If a location to route this to was supplied, put it there, too.
+            if key not in self._arg_routes:
+                raise TypeError('got unrecognized arg: "{0}"'.format(key))
             routes = self._arg_routes[key]
             for route in routes:
                 if route is not None:
