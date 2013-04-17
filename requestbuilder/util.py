@@ -13,9 +13,19 @@
 # OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 import platform
+import requestbuilder
 import requests
 import sys
-from . import __version__
+
+
+def add_default_routes(arglike_obj, default_routes):
+    if isinstance(arglike_obj, requestbuilder.Arg):
+        if arglike_obj.routes is None:
+            arglike_obj.routes = default_routes
+    elif isinstance(arglike_obj, list):
+        # Note that MutuallyExclusiveArgList is a list
+        for item in arglike_obj:
+            add_default_routes(item, default_routes)
 
 
 def aggregate_subclass_fields(cls, field_name):

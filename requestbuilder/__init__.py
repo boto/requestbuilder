@@ -82,8 +82,6 @@ class MutuallyExclusiveArgList(list):
         else:
             self.required = False
             list.__init__(self, args)
-        # This must go nowhere since it has no arg values of its own
-        self.routes = ()
 
 
 class Filter(object):

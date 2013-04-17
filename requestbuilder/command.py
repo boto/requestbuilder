@@ -32,7 +32,7 @@ from .config import Config
 from .exceptions import ArgumentError
 from .logging import configure_root_logger
 from .suite import RequestBuilder
-from .util import aggregate_subclass_fields
+from .util import add_default_routes, aggregate_subclass_fields
 
 class BaseCommand(object):
     '''
@@ -171,9 +171,7 @@ class BaseCommand(object):
 
     def collect_arg_objs(self):
         arg_objs = aggregate_subclass_fields(self.__class__, 'ARGS')
-        for arg_obj in arg_objs:
-            if arg_obj.routes is None:
-                arg_obj.routes = self.default_routes
+        add_default_routes(arg_objs, self.default_routes)
         return arg_objs
 
     def preprocess_arg_objs(self, arg_objs):

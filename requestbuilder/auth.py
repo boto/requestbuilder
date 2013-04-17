@@ -28,7 +28,7 @@ import urllib
 import urlparse
 from . import Arg, AUTH
 from .exceptions import AuthError
-from .util import aggregate_subclass_fields
+from .util import add_default_routes, aggregate_subclass_fields
 
 ISO8601 = '%Y-%m-%dT%H:%M:%SZ'
 
@@ -60,9 +60,7 @@ class BaseAuth(object):
 
     def collect_arg_objs(self):
         arg_objs = aggregate_subclass_fields(self.__class__, 'ARGS')
-        for arg_obj in arg_objs:
-            if arg_obj.routes is None:
-                arg_obj.routes = self.default_routes
+        add_default_routes(arg_objs, self.default_routes)
         return arg_objs
 
     def preprocess_arg_objs(self, arg_objs):

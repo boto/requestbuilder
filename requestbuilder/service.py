@@ -26,7 +26,7 @@ import urlparse
 import weakref
 
 from .exceptions import ClientError, ServerError, ServiceInitError
-from .util import aggregate_subclass_fields
+from .util import add_default_routes, aggregate_subclass_fields
 
 
 class BaseService(object):
@@ -67,9 +67,7 @@ class BaseService(object):
 
     def collect_arg_objs(self):
         service_args = aggregate_subclass_fields(self.__class__, 'ARGS')
-        for service_arg in service_args:
-            if service_arg.routes is None:
-                service_arg.routes = self.default_routes
+        add_default_routes(service_args, self.default_routes)
         if self.auth is not None:
             auth_args = self.auth.collect_arg_objs()
         else:
