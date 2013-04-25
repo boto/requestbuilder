@@ -65,6 +65,7 @@ class BaseCommand(object):
     USAGE = None
     ARGS = []
     SUITE = RequestBuilder
+    __CONFIGURED_FROM_CLI = False
 
     def __init__(self, config=None, _do_cli=False, **kwargs):
         self.args          = kwargs
@@ -78,7 +79,12 @@ class BaseCommand(object):
         self._configure_logging()
         self._process_configfiles()
         if _do_cli:
+            if BaseCommand.__CONFIGURED_FROM_CLI:
+                self.log.warn('global state being configured a second time; '
+                              'bugs may result (usual cause is calling run() '
+                              'for chained commands instead of main())')
             self._configure_global_logging()
+            BaseCommand.__CONFIGURED_FROM_CLI = True
 
         # We need to enforce arg constraints in one location to make this
         # framework equally useful for chained commands and those driven
