@@ -16,9 +16,10 @@ from . import Arg
 from .command import BaseCommand
 
 
-class TabifyingCommand(BaseCommand):
+
+class TabifyingCommand(object):
     '''
-    A request mixin that provides the tabify() function along with its
+    A command mixin that provides the tabify() function along with its
     associated --show-empty-fields command line arg.
     '''
 
