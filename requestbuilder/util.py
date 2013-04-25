@@ -37,3 +37,18 @@ def aggregate_subclass_fields(cls, field_name):
         if field_name in vars(m_class):
             values.extend(getattr(m_class, field_name))
     return values
+
+
+def set_userregion(config, userregion, overwrite=False):
+    if userregion is None:
+        return
+    if '@' in userregion:
+        user, region = userregion.split('@', 1)
+    else:
+        user = None
+        region = userregion
+    if user and (config.current_user is None or overwrite):
+        config.current_user = user
+    if region and (config.current_region is None or overwrite):
+        config.current_region = region
+    return user, region

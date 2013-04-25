@@ -26,11 +26,11 @@ import urlparse
 import weakref
 
 from .exceptions import ClientError, ServerError, ServiceInitError
-from .util import add_default_routes, aggregate_subclass_fields
+from .util import add_default_routes, aggregate_subclass_fields, set_userregion
 
 
 class BaseService(object):
-    NAME        = ''
+    NAME        = None
     DESCRIPTION = ''
     API_VERSION = ''
     MAX_RETRIES = 4  ## TODO:  check the config file
@@ -48,7 +48,7 @@ class BaseService(object):
         self.log       = logging.getLogger(self.__class__.__name__)
         if loglevel is not None:
             self.log.level = loglevel
-        self.session_args = {'verify': False}  # SSL verification is opt-in
+        self.session_args = {}
         self._session = None
 
         if self.AUTH_CLASS is not None:
@@ -81,14 +81,17 @@ class BaseService(object):
     def configure(self):
         # self.args gets highest precedence for self.endpoint and user/region
         self.process_url(self.args.get('url'))
-        if self.args.get('userregion'):
-            self.process_userregion(self.args['userregion'])
+        set_userregion(self.config, self.args.get('userregion'))
         # Environment comes next
-        if self.REGION_ENVVAR in os.environ:
-            self.process_userregion(os.getenv(self.REGION_ENVVAR))
+        set_userregion(self.config, os.getenv(self.REGION_ENVVAR))
         self.process_url(os.getenv(self.URL_ENVVAR))
         # Finally, try the config file
-        self.process_url(self.config.get_region_option(self.NAME + '-url'))
+        if self.NAME is not None:
+            self.process_url(self.config.get_region_option(self.NAME + '-url'))
+
+        # SSL cert verification is opt-in
+        self.session_args['verify'] = self.config.get_region_option_bool(
+            'verify-ssl', default=False)
 
         # Ensure everything is okay and finish up
         self.validate_config()
@@ -108,19 +111,23 @@ class BaseService(object):
 
     def validate_config(self):
         if self.endpoint is None:
-            url_opt = '{0}-url'.format(self.NAME)
-            available_regions = []
-            for rname, rconfig in self.config.regions.iteritems():
-                if url_opt in rconfig and '*' not in rname:
-                    available_regions.append(rname)
-            if len(available_regions) > 0:
-                msg = ('No {0} endpoint to connect to was given. Configured '
-                       'regions with {0} endpoints are: {1}').format(
-                    self.NAME, ', '.join(sorted(available_regions)))
+            if self.NAME is not None:
+                url_opt = '{0}-url'.format(self.NAME)
+                available_regions = []
+                for rname, rconfig in self.config.regions.iteritems():
+                    if url_opt in rconfig and '*' not in rname:
+                        available_regions.append(rname)
+                if len(available_regions) > 0:
+                    msg = ('No {0} endpoint to connect to was given. '
+                           'Configured regions with {0} endpoints are: '
+                           '{1}').format(self.NAME,
+                                         ', '.join(sorted(available_regions)))
+                else:
+                    msg = ('No {0} endpoint to connect to was given. {0} '
+                           'endpoints may be specified in a config file with '
+                           '"{1}".').format(self.NAME, url_opt)
             else:
-                msg = ('No {0} endpoint to connect to was given. {0} '
-                       'endpoints may be specified in a config file with '
-                       '"{1}".').format(self.NAME, url_opt)
+                msg = 'No endpoint to connect to was given'
             raise ServiceInitError(msg)
 
     def process_url(self, url):
@@ -132,19 +139,7 @@ class BaseService(object):
                 userregion = None
             if self.endpoint is None:
                 self.endpoint = endpoint
-            if userregion:
-                self.process_userregion(userregion)
-
-    def process_userregion(self, userregion):
-        if '@' in userregion:
-            user, region = userregion.split('@', 1)
-        else:
-            user   = None
-            region = userregion
-        if region and self.config.current_region is None:
-            self.config.current_region = region
-        if user and self.config.current_user is None:
-            self.config.current_user = user
+            set_userregion(self.config, userregion)
 
     def send_request(self, method='GET', path=None, params=None, headers=None,
                      data=None):
