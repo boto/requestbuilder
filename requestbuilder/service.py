@@ -41,7 +41,7 @@ class BaseService(object):
 
     ARGS = []
 
-    def __init__(self, config, loglevel=None, **kwargs):
+    def __init__(self, config, auth=None, loglevel=None, **kwargs):
         self.args      = kwargs
         self.config    = config
         self.endpoint  = None
@@ -51,8 +51,11 @@ class BaseService(object):
         self.session_args = {}
         self._session = None
 
-        if self.AUTH_CLASS is not None:
-            self.auth = self.AUTH_CLASS(self)
+        if auth is not None:
+            self.auth = auth
+            self.auth.service = weakref.proxy(self)
+        elif self.AUTH_CLASS is not None:
+            self.auth = self.AUTH_CLASS(self.config)
             self.auth.service = weakref.proxy(self)
         else:
             self.auth = None
@@ -63,6 +66,8 @@ class BaseService(object):
 
     @property
     def region_name(self):
+        # FIXME:  this makes it impossible for services in different regions
+        # to share configuration.
         return self.config.get_region()
 
     def collect_arg_objs(self):

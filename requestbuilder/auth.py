@@ -22,13 +22,13 @@ import hmac
 import os
 import logging
 import re
+from requestbuilder import Arg
+from requestbuilder.exceptions import AuthError
+from requestbuilder.util import add_default_routes, aggregate_subclass_fields
 import six
 import time
 import urllib
 import urlparse
-from . import Arg, AUTH
-from .exceptions import AuthError
-from .util import add_default_routes, aggregate_subclass_fields
 
 ISO8601 = '%Y-%m-%dT%H:%M:%SZ'
 
@@ -42,17 +42,19 @@ class BaseAuth(object):
     '''
     ARGS = []
 
-    def __init__(self, service, **kwargs):
+    def __init__(self, config, **kwargs):
         self.args    = kwargs
-        self.config  = service.config
-        self.service = service
+        self.config  = config
+        # Auth handlers are much more tightly coupled with their associated
+        # services.  Since some of them need to have access to stuff like
+        # endpoint URLs and region names the service will automatically give
+        # the auth handler a weak reference to itself when it creates the auth
+        # handler itself or when you pass it to the service's __init__ method.
+        # Be aware of this when you set the service's auth attribute by hand --
+        # you may need to point it at the service for it to function properly.
+        self.service = None
 
-        # Yes, service.log.getChild is shorter, but it was added in 2.7.
-        if service.log is logging.root:
-            self.log = logging.getLogger(self.__class__.__name__)
-        else:
-            self.log = logging.getLogger('{0}.{1}'.format(
-                    service.log.name, self.__class__.__name__))
+        self.log = logging.getLogger(self.__class__.__name__)
 
     @property
     def default_routes(self):
