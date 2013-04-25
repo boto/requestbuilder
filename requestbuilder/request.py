@@ -132,6 +132,8 @@ class BaseRequest(BaseCommand):
             return self.handle_server_error(err)
         finally:
             # Empty the socket buffer so it can be reused
+            ## TODO:  is this a good idea?  We might be forced to download lots
+            ##        of data on error.
             try:
                 if self.response is not None:
                     self.response.content

@@ -201,7 +201,7 @@ class BaseService(object):
                                 val = '<redacted>'
                             self.log.debug('request data:   %s: %s', key, val)
                     p_request.start_time = datetime.datetime.now()
-                    response = self.session.send(p_request)
+                    response = self.session.send(p_request, stream=True)
                 else:
                     request = requests.Request(method=method, url=url,
                                                params=params, data=data,
