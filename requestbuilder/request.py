@@ -78,7 +78,7 @@ class BaseRequest(BaseCommand):
         self.path      = None
         self.headers   = {}
         self.params    = {}
-        self.body      = None
+        self.body      = ''
 
         # HTTP response obtained from the server
         self.response = None
