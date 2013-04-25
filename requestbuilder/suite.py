@@ -13,9 +13,9 @@
 # OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 import platform
+from requestbuilder import __version__
 import requests
 import sys
-from . import __version__
 
 
 class RequestBuilder(object):
@@ -27,9 +27,8 @@ class RequestBuilder(object):
         self.__user_agent = None
 
     @staticmethod
-    def print_version_and_exit():
-        print >> sys.stderr, 'requestbuilder', __version__, '(Prelude)'
-        sys.exit()
+    def format_version():
+        return 'requestbuilder {0} (Prelude)'.format(__version__)
 
     @staticmethod
     def list_config_files():

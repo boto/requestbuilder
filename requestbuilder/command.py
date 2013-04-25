@@ -161,8 +161,8 @@ class BaseCommand(object):
         parser.add_argument('--debugger', action='store_true', dest='_debugger',
                             default=argparse.SUPPRESS,
                             help='launch interactive debugger on error')
-        parser.add_argument('--version', action='store_true', dest='_version',
-                            default=argparse.SUPPRESS,
+        parser.add_argument('--version', action='version',
+                            version=self.suite.format_version(),
                             help="show the program's version and exit")
         if any('-h' in arg_obj.pargs for arg_obj in arg_objs
                if isinstance(arg_obj, Arg)):
@@ -224,8 +224,6 @@ class BaseCommand(object):
         if cli_args.pop('_debugger', False):
             self.__debug = True
             sys.excepthook = _debugger_except_hook
-        if cli_args.get('_version', False):
-            self.suite.print_version_and_exit()
         # Everything goes in self.args.  distribute_args() also puts them
         # elsewhere later on in the process.
         self.args.update(cli_args)
