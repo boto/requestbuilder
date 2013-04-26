@@ -97,7 +97,7 @@ def parse_listdelimited_aws_xml(xml_stream, list_tags=None):
         <a>
           <b>
             <c>spam</c>
-          </b>          + ['b'] -> {'a': [{'c': 'spam'}, {'c': 'eggs'}]}
+          </b>          + ['a'] -> {'a': [{'c': 'spam'}, {'c': 'eggs'}]}
           <b>
             <c>eggs</c>
           </b>
@@ -124,14 +124,28 @@ def parse_listdelimited_aws_xml(xml_stream, list_tags=None):
                     # Add the thing we just finished parsing to the list
                     if stack[-1][1] == {}:
                         # No inner elements; use text instead
-                        stack[-2][1].append(elem.text)
+                        if elem.text is not None:
+                            stack[-2][1].append(elem.text)
+                        else:
+                            # No text either, so use {} to make code like this
+                            # work when presented with an empty element that
+                            # does not match a list tag:
+                            # response.get('foo', {}).get('bar')
+                            stack[-2][1].append({})
                     else:
                         stack[-2][1].append(stack[-1][1])
                 else:
                     # Add the thing we just finished parsing to the dict
                     if stack[-1][1] == {}:
                         # No inner elements; use text instead
-                        stack[-2][1][tag] = elem.text
+                        if elem.text is not None:
+                            stack[-2][1][tag] = elem.text
+                        else:
+                            # No text either, so use {} to make code like this
+                            # work when presented with an empty element that
+                            # does not match a list tag:
+                            # response.get('foo', {}).get('bar')
+                            stack[-2][1][tag] = {}
                     else:
                         stack[-2][1][tag] = stack[-1][1]
                 stack.pop()
