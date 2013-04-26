@@ -83,6 +83,8 @@ class BaseRequest(BaseCommand):
         # HTTP response obtained from the server
         self.response = None
 
+        self.__configured = False
+
         BaseCommand.__init__(self, **kwargs)
 
     def _post_init(self):
@@ -103,6 +105,7 @@ class BaseRequest(BaseCommand):
     def configure(self):
         BaseCommand.configure(self)
         self.service.configure()
+        self.__configured = True
 
     @property
     def name(self):
@@ -116,6 +119,8 @@ class BaseRequest(BaseCommand):
             return None
 
     def send(self):
+        if not self.__configured:
+            self.log.warn('send() called before configure(); bugs may result')
         headers = dict(self.headers or {})
         headers.setdefault('User-Agent', self.suite.get_user_agent())
         params  = self.prepare_params()
