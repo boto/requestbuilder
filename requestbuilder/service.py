@@ -20,13 +20,16 @@ import functools
 import logging
 import os.path
 import random
+from requestbuilder import SERVICE
+from requestbuilder.exceptions import (ClientError, ServerError,
+    ServiceInitError)
+from requestbuilder.util import (add_default_routes, aggregate_subclass_fields,
+    set_userregion)
 import requests.exceptions
 import time
 import urlparse
 import weakref
 
-from .exceptions import ClientError, ServerError, ServiceInitError
-from .util import add_default_routes, aggregate_subclass_fields, set_userregion
 
 
 class BaseService(object):
@@ -40,6 +43,7 @@ class BaseService(object):
     URL_ENVVAR = None
 
     ARGS = []
+    DEFAULT_ROUTES = (SERVICE,)
 
     def __init__(self, config, auth=None, loglevel=None, **kwargs):
         self.args      = kwargs
@@ -61,10 +65,6 @@ class BaseService(object):
             self.auth = None
 
     @property
-    def default_routes(self):
-        return (self.args,)
-
-    @property
     def region_name(self):
         # FIXME:  this makes it impossible for services in different regions
         # to share configuration.
@@ -72,7 +72,7 @@ class BaseService(object):
 
     def collect_arg_objs(self):
         service_args = aggregate_subclass_fields(self.__class__, 'ARGS')
-        add_default_routes(service_args, self.default_routes)
+        add_default_routes(service_args, self.DEFAULT_ROUTES)
         if self.auth is not None:
             auth_args = self.auth.collect_arg_objs()
         else:

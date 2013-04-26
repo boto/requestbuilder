@@ -64,6 +64,7 @@ class BaseCommand(object):
     DESCRIPTION = ''
     USAGE = None
     ARGS = []
+    DEFAULT_ROUTES = ()
     SUITE = RequestBuilder
     __CONFIGURED_FROM_CLI = False
 
@@ -119,11 +120,6 @@ class BaseCommand(object):
             else:
                 raise
 
-    @property
-    def default_routes(self):
-        # This is a property so we can return something that references self.
-        return (None,)
-
     def _configure_logging(self):
         self.log = logging.getLogger(self.name)
         if self.debug:
@@ -177,7 +173,7 @@ class BaseCommand(object):
 
     def collect_arg_objs(self):
         arg_objs = aggregate_subclass_fields(self.__class__, 'ARGS')
-        add_default_routes(arg_objs, self.default_routes)
+        add_default_routes(arg_objs, self.DEFAULT_ROUTES)
         return arg_objs
 
     def preprocess_arg_objs(self, arg_objs):

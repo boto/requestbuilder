@@ -19,15 +19,14 @@ from functools import partial
 import logging
 import os.path
 import platform
+from requestbuilder import EMPTY, PARAMS
+from requestbuilder.command import BaseCommand
+from requestbuilder.exceptions import ServerError
+from requestbuilder.service import BaseService
+from requestbuilder.util import aggregate_subclass_fields
+from requestbuilder.xmlparse import parse_listdelimited_aws_xml
 import sys
 import textwrap
-
-from . import EMPTY
-from .command import BaseCommand
-from .exceptions import ServerError
-from .service import BaseService
-from .util import aggregate_subclass_fields
-from .xmlparse import parse_listdelimited_aws_xml
 
 
 class BaseRequest(BaseCommand):
@@ -68,6 +67,7 @@ class BaseRequest(BaseCommand):
     NAME          = None
     METHOD        = 'GET'
 
+    DEFAULT_ROUTES = (PARAMS,)
     LIST_TAGS = []
 
 
@@ -90,10 +90,6 @@ class BaseRequest(BaseCommand):
             self.service = self.SERVICE_CLASS(self.config,
                                               loglevel=self.log.level)
         BaseCommand._post_init(self)
-
-    @property
-    def default_routes(self):
-        return (self.params,)
 
     def collect_arg_objs(self):
         request_args = BaseCommand.collect_arg_objs(self)

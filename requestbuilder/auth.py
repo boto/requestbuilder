@@ -22,7 +22,7 @@ import hmac
 import os
 import logging
 import re
-from requestbuilder import Arg
+from requestbuilder import Arg, AUTH
 from requestbuilder.exceptions import AuthError
 from requestbuilder.util import add_default_routes, aggregate_subclass_fields
 import six
@@ -41,6 +41,7 @@ class BaseAuth(object):
     necessary functions to effect an authentication scheme.
     '''
     ARGS = []
+    DEFAULT_ROUTES = (AUTH,)
 
     def __init__(self, config, **kwargs):
         self.args    = kwargs
@@ -56,13 +57,9 @@ class BaseAuth(object):
 
         self.log = logging.getLogger(self.__class__.__name__)
 
-    @property
-    def default_routes(self):
-        return (self.args,)
-
     def collect_arg_objs(self):
         arg_objs = aggregate_subclass_fields(self.__class__, 'ARGS')
-        add_default_routes(arg_objs, self.default_routes)
+        add_default_routes(arg_objs, self.DEFAULT_ROUTES)
         return arg_objs
 
     def preprocess_arg_objs(self, arg_objs):
