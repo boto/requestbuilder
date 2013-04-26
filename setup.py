@@ -73,7 +73,7 @@ setup(name = 'requestbuilder',
       author_email = 'gholms@devzero.com',
       packages = ['requestbuilder',
                   'requestbuilder.commands',
-                 ]
+                 ],
       license = 'ISC',
       platforms = 'Posix; MacOS X',
       classifiers = ['Development Status :: 3 - Alpha',
