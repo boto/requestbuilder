@@ -159,6 +159,10 @@ class BaseService(object):
         else:
             url = self.endpoint
 
+        headers = dict(headers)
+        if 'host' not in map(str.lower, headers.iterkeys()):
+            headers['Host'] = urlparse.urlparse(self.endpoint).netloc
+
         hooks = {'pre_send': functools.partial(_log_request_data,  self.log),
                  'response': functools.partial(_log_response_data, self.log)}
         # Note that pre_send only works on requests 0
