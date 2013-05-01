@@ -59,7 +59,7 @@ class BaseService(object):
             self.auth = auth
             self.auth.service = weakref.proxy(self)
         elif self.AUTH_CLASS is not None:
-            self.auth = self.AUTH_CLASS(self.config)
+            self.auth = self.AUTH_CLASS(self.config, loglevel=self.log.level)
             self.auth.service = weakref.proxy(self)
         else:
             self.auth = None

@@ -43,7 +43,7 @@ class BaseAuth(object):
     ARGS = []
     DEFAULT_ROUTES = (AUTH,)
 
-    def __init__(self, config, **kwargs):
+    def __init__(self, config, loglevel=None, **kwargs):
         self.args    = kwargs
         self.config  = config
         # Auth handlers are much more tightly coupled with their associated
@@ -56,6 +56,8 @@ class BaseAuth(object):
         self.service = None
 
         self.log = logging.getLogger(self.__class__.__name__)
+        if loglevel is not None:
+            self.log.level = loglevel
 
     def collect_arg_objs(self):
         arg_objs = aggregate_subclass_fields(self.__class__, 'ARGS')
