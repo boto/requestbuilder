@@ -1,4 +1,4 @@
-# Copyright (c) 2012, Eucalyptus Systems, Inc.
+# Copyright (c) 2012-2013, Eucalyptus Systems, Inc.
 #
 # Permission to use, copy, modify, and/or distribute this software for
 # any purpose with or without fee is hereby granted, provided that the
@@ -11,6 +11,9 @@
 # WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
 # OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+# This module has some very hot functions, so some of the string comparisons
+# and splits use slightly less-readable syntaxes to improve performance.
 
 try:
     from xml.etree import cElementTree as ElementTree
@@ -52,22 +55,36 @@ def parse_aws_xml(xml_stream, list_item_tags=None):
     try:
         for event, elem in ElementTree.iterparse(xml_stream,
                                                  events=('start', 'end')):
-            tag = _strip_tag(elem.tag)
-            if event == 'start':
+            tag = _strip_ns(elem.tag)
+            if event[0] == 's':  # start
                 stack.append((tag, {}))
-            if event == 'end':
+            else:  # end
                 if tag in list_item_tags:
                     # We're ending a list item, so append it to stack[-2]'s list
                     stack[-2][1].setdefault(tag, [])
-                    if stack[-1][1] == {}:
+                    if len(stack[-1][1]) == 0:
                         # No inner elements; use text instead
-                        stack[-2][1][tag].append(elem.text)
+                        if elem.text is not None:
+                            stack[-2][1][tag].append(elem.text)
+                        else:
+                            # No text either, so use {} to make code like this
+                            # work when presented with an empty element that
+                            # does not match a list tag:
+                            # response.get('foo', {}).get('bar')
+                            stack[-2][1][tag].append({})
                     else:
                         stack[-2][1][tag].append(stack[-1][1])
                 else:
-                    if stack[-1][1] == {}:
+                    if len(stack[-1][1]) == 0:
                         # No inner elements; use text instead
-                        stack[-2][1][tag] = elem.text
+                        if elem.text is not None:
+                            stack[-2][1][tag] = elem.text
+                            # No text either, so use {} to make code like this
+                            # work when presented with an empty element that
+                            # does not match a list tag:
+                            # response.get('foo', {}).get('bar')
+                        else:
+                            stack[-2][1][tag] = {}
                     else:
                         stack[-2][1][tag] = stack[-1][1]
                 stack.pop()
@@ -111,18 +128,18 @@ def parse_listdelimited_aws_xml(xml_stream, list_tags=None):
     try:
         for event, elem in ElementTree.iterparse(xml_stream,
                                                  events=('start', 'end')):
-            tag = _strip_tag(elem.tag)
-            if event == 'start':
+            tag = _strip_ns(elem.tag)
+            if event[0] == 's':  # start
                 if tag in list_tags:
                     # Start a new list
                     stack.append((tag, []))
                 else:
                     stack.append((tag, {}))
-            elif event == 'end':
+            else:  # end
                 assert tag == stack[-1][0]
                 if isinstance(stack[-2][1], list):
                     # Add the thing we just finished parsing to the list
-                    if stack[-1][1] == {}:
+                    if len(stack[-1][1]) == 0:
                         # No inner elements; use text instead
                         if elem.text is not None:
                             stack[-2][1].append(elem.text)
@@ -136,7 +153,7 @@ def parse_listdelimited_aws_xml(xml_stream, list_tags=None):
                         stack[-2][1].append(stack[-1][1])
                 else:
                     # Add the thing we just finished parsing to the dict
-                    if stack[-1][1] == {}:
+                    if len(stack[-1][1]) == 0:
                         # No inner elements; use text instead
                         if elem.text is not None:
                             stack[-2][1][tag] = elem.text
@@ -155,8 +172,8 @@ def parse_listdelimited_aws_xml(xml_stream, list_tags=None):
     return stack[0][1]
 
 
-def _strip_tag(elem_tag):
-    if elem_tag.startswith('{'):
-        return elem_tag.split('}', 1)[1]
+def _strip_ns(elem_tag):
+    if elem_tag[0] == '{':
+        return elem_tag[elem_tag.find('}')+1:]
     else:
         return elem_tag
