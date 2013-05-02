@@ -62,7 +62,7 @@ def parse_aws_xml(xml_stream, list_item_tags=None):
                 if tag in list_item_tags:
                     # We're ending a list item, so append it to stack[-2]'s list
                     stack[-2][1].setdefault(tag, [])
-                    if len(stack[-1][1]) == 0:
+                    if stack[-1][1] == {}:
                         # No inner elements; use text instead
                         if elem.text is not None:
                             stack[-2][1][tag].append(elem.text)
@@ -75,7 +75,7 @@ def parse_aws_xml(xml_stream, list_item_tags=None):
                     else:
                         stack[-2][1][tag].append(stack[-1][1])
                 else:
-                    if len(stack[-1][1]) == 0:
+                    if stack[-1][1] == {}:
                         # No inner elements; use text instead
                         if elem.text is not None:
                             stack[-2][1][tag] = elem.text
@@ -139,7 +139,7 @@ def parse_listdelimited_aws_xml(xml_stream, list_tags=None):
                 assert tag == stack[-1][0]
                 if isinstance(stack[-2][1], list):
                     # Add the thing we just finished parsing to the list
-                    if len(stack[-1][1]) == 0:
+                    if stack[-1][1] == {}:
                         # No inner elements; use text instead
                         if elem.text is not None:
                             stack[-2][1].append(elem.text)
@@ -153,7 +153,7 @@ def parse_listdelimited_aws_xml(xml_stream, list_tags=None):
                         stack[-2][1].append(stack[-1][1])
                 else:
                     # Add the thing we just finished parsing to the dict
-                    if len(stack[-1][1]) == 0:
+                    if stack[-1][1] == {}:
                         # No inner elements; use text instead
                         if elem.text is not None:
                             stack[-2][1][tag] = elem.text
