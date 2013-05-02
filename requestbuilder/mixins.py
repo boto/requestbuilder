@@ -12,6 +12,7 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
 # OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
+import argparse
 import math
 from requestbuilder import Arg, MutuallyExclusiveArgList
 import sys
@@ -58,7 +59,15 @@ if 'progressbar' in sys.modules:
                 default=sys.stdout.isatty(), route_to=None, help='''do not
                 show progress (the default when run non-interactively)'''))]
 else:
-    _PROGRESS_BAR_COMMAND_ARGS = []
+    # Keep them around so scripts don't break, but make them non-functional
+    #
+    # This isn't in a MutuallyExclusiveArgList because of an argparse bug:
+    # http://bugs.python.org/issue17890
+    _PROGRESS_BAR_COMMAND_ARGS = [
+        Arg('--progress', dest='show_progress', action='store_false',
+            default=False, route_to=None, help=argparse.SUPPRESS),
+        Arg('--no-progress', dest='show_progress', action='store_false',
+            default=False, route_to=None, help=argparse.SUPPRESS)]
 
 
 class FileTransferProgressBarMixin(object):
