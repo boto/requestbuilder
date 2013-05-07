@@ -23,7 +23,7 @@ except ImportError:
     pass
 
 
-class TabifyingCommand(object):
+class TabifyingMixin(object):
     '''
     A command mixin that provides the tabify() function along with its
     associated --show-empty-fields command line arg.
