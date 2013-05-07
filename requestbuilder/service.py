@@ -36,7 +36,7 @@ class BaseService(object):
     NAME        = None
     DESCRIPTION = ''
     API_VERSION = ''
-    MAX_RETRIES = 4  ## TODO:  check the config file
+    MAX_RETRIES = 2
 
     AUTH_CLASS = None
     REGION_ENVVAR = None
@@ -45,13 +45,15 @@ class BaseService(object):
     ARGS = []
     DEFAULT_ROUTES = (SERVICE,)
 
-    def __init__(self, config, auth=None, loglevel=None, **kwargs):
+    def __init__(self, config, auth=None, loglevel=None, max_retries=None,
+                 **kwargs):
         self.args      = kwargs
         self.config    = config
         self.endpoint  = None
         self.log       = logging.getLogger(self.__class__.__name__)
         if loglevel is not None:
             self.log.level = loglevel
+        self.max_retries = max_retries
         self.session_args = {}
         self._session = None
 
@@ -93,6 +95,14 @@ class BaseService(object):
         # Finally, try the config file
         if self.NAME is not None:
             self.process_url(self.config.get_region_option(self.NAME + '-url'))
+
+        # Set timeout and retry handlers
+        if self.max_retries is None:
+            config_max_retries = self.config.get_global_option('max-retries')
+            if config_max_retries is not None:
+                self.max_retries = int(config_max_retries)
+            else:
+                self.max_retries = self.MAX_RETRIES
 
         # SSL cert verification is opt-in
         self.session_args['verify'] = self.config.get_region_option_bool(
@@ -168,7 +178,7 @@ class BaseService(object):
         # Note that pre_send only works on requests 0
 
         try:
-            max_tries = self.MAX_RETRIES + 1
+            max_tries = self.max_retries + 1
             assert max_tries >= 1
             for attempt_no, delay in enumerate(_generate_delays(max_tries), 1):
                 # Use exponential backoff if this is a retry
