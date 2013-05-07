@@ -220,12 +220,14 @@ class BaseService(object):
                                 val = '<redacted>'
                             self.log.debug('request data:   %s: %s', key, val)
                     p_request.start_time = datetime.datetime.now()
-                    response = self.session.send(p_request, stream=True)
+                    response = self.session.send(p_request, stream=True,
+                                                 timeout=10)
                 else:
                     request = requests.Request(method=method, url=url,
                                                params=params, data=data,
                                                headers=headers,
-                                               allow_redirects=True)
+                                               allow_redirects=True,
+                                               timeout=10)
                     if self.auth is not None:
                         self.auth(request)
                     request.session = self.session
