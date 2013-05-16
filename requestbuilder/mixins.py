@@ -15,6 +15,7 @@
 import argparse
 import math
 from requestbuilder import Arg, MutuallyExclusiveArgList
+import signal
 import sys
 
 try:
@@ -96,17 +97,31 @@ class FileTransferProgressBarMixin(object):
                     widgets.append(progressbar.AdaptiveETA())
                 else:
                     widgets.append(progressbar.ETA())
-                return progressbar.ProgressBar(widgets=widgets,
-                                               maxval=(maxval or sys.maxint),
-                                               poll=0.05)
+                bar = progressbar.ProgressBar(widgets=widgets,
+                                              maxval=(maxval or sys.maxint),
+                                              poll=0.05)
+                #
+                # The ProgressBar class initializer installs a signal handler
+                # for SIGWINCH to resize the progress bar. Sometimes this can
+                # interrupt long running system calls which can cause an
+                # IOError exception to be raised. The call to siginterrupt
+                # below will retrieve the currently installed signal handler
+                # for SIGWINCH and set the SA_RESTART flag. This will cause
+                # system calls to be restarted after the handler has been
+                # executed instead of raising an exception.
+                #
+                signal.siginterrupt(signal.SIGWINCH, False)
+                return bar
             else:
                 widgets += [_IndeterminateBouncingBar(marker='='), ' ',
                             _FileSize(), ' ',
                             progressbar.FileTransferSpeed(), ' ',
                             progressbar.Timer(format='Time: %s')]
-                return _IndeterminateProgressBar(widgets=widgets,
-                                                 maxval=(maxval or sys.maxint),
-                                                 poll=0.05)
+                bar = _IndeterminateProgressBar(widgets=widgets,
+                                                maxval=(maxval or sys.maxint),
+                                                poll=0.05)
+                signal.siginterrupt(signal.SIGWINCH, False)
+                return bar
         else:
             return _EveryMethodObject()
 
