@@ -97,9 +97,9 @@ class FileTransferProgressBarMixin(object):
                     widgets.append(progressbar.AdaptiveETA())
                 else:
                     widgets.append(progressbar.ETA())
-                bar = progressbar.ProgressBar(widgets=widgets,
-                                              maxval=(maxval or sys.maxint),
-                                              poll=0.05)
+                pbar = progressbar.ProgressBar(widgets=widgets,
+                                               maxval=(maxval or sys.maxint),
+                                               poll=0.05)
                 #
                 # The ProgressBar class initializer installs a signal handler
                 # for SIGWINCH to resize the progress bar. Sometimes this can
@@ -111,17 +111,18 @@ class FileTransferProgressBarMixin(object):
                 # executed instead of raising an exception.
                 #
                 signal.siginterrupt(signal.SIGWINCH, False)
-                return bar
+                return pbar
             else:
                 widgets += [_IndeterminateBouncingBar(marker='='), ' ',
                             _FileSize(), ' ',
                             progressbar.FileTransferSpeed(), ' ',
                             progressbar.Timer(format='Time: %s')]
-                bar = _IndeterminateProgressBar(widgets=widgets,
-                                                maxval=(maxval or sys.maxint),
-                                                poll=0.05)
+                pbar = _IndeterminateProgressBar(widgets=widgets,
+                                                 maxval=(maxval or sys.maxint),
+                                                 poll=0.05)
+                # See comment above
                 signal.siginterrupt(signal.SIGWINCH, False)
-                return bar
+                return pbar
         else:
             return _EveryMethodObject()
 
