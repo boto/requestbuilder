@@ -20,6 +20,11 @@ try:
 except ImportError:
     from xml.etree import ElementTree
 
+try:
+    from xml.etree.ElementTree import ParseError
+except ImportError:
+    from xml.parsers.expat import ExpatError as ParseError
+
 
 def parse_aws_xml(xml_stream, list_item_tags=None):
     '''
@@ -89,7 +94,7 @@ def parse_aws_xml(xml_stream, list_item_tags=None):
                         stack[-2][1][tag] = stack[-1][1]
                 stack.pop()
                 elem.clear()  # free up some memory
-    except ElementTree.ParseError:
+    except (ParseError, SyntaxError):
         raise ValueError('XML parse error')
     return stack[0][1]
 
@@ -167,7 +172,7 @@ def parse_listdelimited_aws_xml(xml_stream, list_tags=None):
                         stack[-2][1][tag] = stack[-1][1]
                 stack.pop()
                 elem.clear()  # free up some memory
-    except ElementTree.ParseError:
+    except (ParseError, SyntaxError):
         raise ValueError('XML parse error')
     return stack[0][1]
 
