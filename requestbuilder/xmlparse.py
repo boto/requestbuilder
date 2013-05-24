@@ -23,6 +23,7 @@ except ImportError:
 try:
     from xml.etree.ElementTree import ParseError
 except ImportError:
+    # Python 2.6's ElementTree doesn't have ParseError
     from xml.parsers.expat import ExpatError as ParseError
 
 
