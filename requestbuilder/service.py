@@ -33,10 +33,11 @@ import weakref
 
 
 class BaseService(object):
-    NAME        = None
+    NAME = None
     DESCRIPTION = ''
     API_VERSION = ''
     MAX_RETRIES = 2
+    TIMEOUT = 30  # socket timeout in seconds
 
     AUTH_CLASS = None
     REGION_ENVVAR = None
@@ -46,7 +47,7 @@ class BaseService(object):
     DEFAULT_ROUTES = (SERVICE,)
 
     def __init__(self, config, auth=None, loglevel=None, max_retries=None,
-                 **kwargs):
+                 timeout=None, **kwargs):
         self.args      = kwargs
         self.config    = config
         self.endpoint  = None
@@ -55,6 +56,7 @@ class BaseService(object):
             self.log.level = loglevel
         self.max_retries = max_retries
         self.session_args = {}
+        self.timeout = timeout
         self._session = None
 
         if auth is not None:
@@ -96,13 +98,19 @@ class BaseService(object):
         if self.NAME is not None:
             self.process_url(self.config.get_region_option(self.NAME + '-url'))
 
-        # Set timeout and retry handlers
+        # Configure timeout and retry handlers
         if self.max_retries is None:
             config_max_retries = self.config.get_global_option('max-retries')
             if config_max_retries is not None:
                 self.max_retries = int(config_max_retries)
             else:
                 self.max_retries = self.MAX_RETRIES
+        if self.timeout is None:
+            config_timeout = self.config.get_global_option('timeout')
+            if config_timeout is not None:
+                self.timeout = float(config_timeout)
+            else:
+                self.timeout = self.TIMEOUT
 
         # SSL cert verification is opt-in
         self.session_args['verify'] = self.config.get_region_option_bool(
@@ -221,13 +229,13 @@ class BaseService(object):
                             self.log.debug('request data:   %s: %s', key, val)
                     p_request.start_time = datetime.datetime.now()
                     response = self.session.send(p_request, stream=True,
-                                                 timeout=10)
+                                                 timeout=self.timeout)
                 else:
                     request = requests.Request(method=method, url=url,
                                                params=params, data=data,
                                                headers=headers,
                                                allow_redirects=True,
-                                               timeout=10)
+                                               timeout=self.timeout)
                     if self.auth is not None:
                         self.auth(request)
                     request.session = self.session
