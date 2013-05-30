@@ -181,78 +181,58 @@ class BaseService(object):
         if 'host' not in map(str.lower, headers.iterkeys()):
             headers['Host'] = urlparse.urlparse(self.endpoint).netloc
 
-        hooks = {'pre_send': functools.partial(_log_request_data,  self.log),
-                 'response': functools.partial(_log_response_data, self.log)}
-        # Note that pre_send only works on requests 0
-
         try:
             max_tries = self.max_retries + 1
             assert max_tries >= 1
-            for attempt_no, delay in enumerate(_generate_delays(max_tries), 1):
-                # Use exponential backoff if this is a retry
-                if delay > 0:
-                    self.log.debug('will retry after %.3f seconds', delay)
-                    time.sleep(delay)
+            redirects_left = 5
+            if isinstance(data, file) and hasattr(data, 'seek'):
+                # If we're redirected we need to be able to reset
+                data_file_offset = data.tell()
+            else:
+                data_file_offset = None
+            while True:
+                for attempt_no, delay in enumerate(
+                    _generate_delays(max_tries), 1):
+                    # Use exponential backoff if this is a retry
+                    if delay > 0:
+                        self.log.debug('will retry after %.3f seconds', delay)
+                        time.sleep(delay)
 
-                self.log.info('sending request (attempt %i of %i)', attempt_no,
-                              max_tries)
-                # Requests 1 gives auth handlers PreparedRequests instead of the
-                # original Requests like version 0 does.  Since most of our auth
-                # handlers inspect and/or modify things that aren't headers, we
-                # manually apply auth to it in this method to make things less
-                # painful.
-                if requests.__version__ >= '1.0':
-                    request = requests.Request(method=method, url=url,
-                                               params=params, data=data,
-                                               headers=headers)
-                    if self.auth is not None:
-                        self.auth(request)
-                    # A prepared request gives us extra info we want to log
-                    p_request = request.prepare()
-                    p_request.hooks = {'response': hooks['response']}
-                    self.log.debug('request method: %s', request.method)
-                    self.log.debug('request url:    %s', p_request.url)
-                    if isinstance(p_request.headers, dict):
-                        for key, val in sorted(p_request.headers.iteritems()):
-                            if key.lower().endswith('password'):
-                                val = '<redacted>'
-                            self.log.debug('request header: %s: %s', key, val)
-                    if isinstance(request.params, dict):
-                        for key, val in sorted(request.params.iteritems()):
-                            if key.lower().endswith('password'):
-                                val = '<redacted>'
-                            self.log.debug('request param:  %s: %s', key, val)
-                    if isinstance(request.data, dict):
-                        for key, val in sorted(request.data.iteritems()):
-                            if key.lower().endswith('password'):
-                                val = '<redacted>'
-                            self.log.debug('request data:   %s: %s', key, val)
-                    p_request.start_time = datetime.datetime.now()
-                    response = self.session.send(p_request, stream=True,
-                                                 timeout=self.timeout)
-                else:
-                    request = requests.Request(method=method, url=url,
-                                               params=params, data=data,
-                                               headers=headers,
-                                               allow_redirects=True,
-                                               timeout=self.timeout)
-                    if self.auth is not None:
-                        self.auth(request)
-                    request.session = self.session
-                    # A hook lets us log all the info that requests adds right
-                    # before sending
-                    request.hooks = hooks
-                    request.start_time = datetime.datetime.now()
-                    request.send()
-                    response = request.response
-                if response.status_code not in (500, 503):
-                    break
-                # If it *was* in that list, retry
-            if response.status_code >= 300:
-                # We include redirects because at this point, requests should
-                # have handled it, but hasn't done so for some reason.
-                self.handle_http_error(response)
-            return response
+                    self.log.info('sending request (attempt %i of %i)',
+                                  attempt_no, max_tries)
+                    response = self.__log_and_send_request(method, url, params,
+                                                           data, headers)
+                    if response.status_code not in (500, 503):
+                        break
+                    # If it *was* in that list, retry
+                if (response.status_code in (301, 302, 307, 308) and
+                    redirects_left > 0 and 'Location' in response.headers):
+                    # Standard redirect -- we need to handle this ourselves
+                    # because we have to re-sign requests when their URLs
+                    # change.
+                    redirects_left -= 1
+                    parsed_rdr = urlparse.urlparse(response.headers['Location'])
+                    parsed_url = urlparse.urlparse(url)
+                    new_url_bits = []
+                    for rdr_bit, url_bit in zip(parsed_rdr, parsed_url):
+                        new_url_bits.append(rdr_bit or url_bit)
+                    if 'Host' in headers:
+                        headers['Host'] = new_url_bits[1]  # netloc
+                    url = urlparse.urlunparse(new_url_bits)
+                    self.log.debug('redirecting to %s (%i redirect(s) '
+                                   'remaining)', url, redirects_left)
+                    if data_file_offset is not None:
+                        self.log.debug('re-seeking body to beginning of file')
+                        # pylint: disable=E1101
+                        data.seek(data_file_offset)
+                        # pylint: enable=E1101
+                    continue
+                elif response.status_code >= 300:
+                    # We include 30x because we've handled the standard method
+                    # of redirecting, but the server might still be trying to
+                    # redirect another way for some reason.
+                    self.handle_http_error(response)
+                return response
         except requests.exceptions.ConnectionError as exc:
             if len(exc.args) > 0 and hasattr(exc.args[0], 'reason'):
                 raise ClientError(exc.args[0].reason)
@@ -265,6 +245,59 @@ class BaseService(object):
 
     def handle_http_error(self, response):
         raise ServerError(response)
+
+    def __log_and_send_request(self, method, url, params, data, headers):
+        # Requests 1 gives auth handlers PreparedRequests instead of the
+        # original Requests like version 0 does.  Since most of our auth
+        # handlers inspect and/or modify things that aren't headers, we
+        # manually apply auth to it in this method to make things less painful.
+        #
+        # The pre_send hook only works on requests 0.  We replicate that for
+        # requests 1 just below.
+        hooks = {'pre_send': functools.partial(_log_request_data,  self.log),
+                 'response': functools.partial(_log_response_data, self.log)}
+        if requests.__version__ >= '1.0':
+            request = requests.Request(method=method, url=url,
+                                       params=params, data=data,
+                                       headers=headers)
+            if self.auth is not None:
+                self.auth(request)
+            # A prepared request gives us extra info we want to log
+            p_request = request.prepare()
+            p_request.hooks = {'response': hooks['response']}
+            self.log.debug('request method: %s', request.method)
+            self.log.debug('request url:    %s', p_request.url)
+            if isinstance(p_request.headers, dict):
+                for key, val in sorted(p_request.headers.iteritems()):
+                    if key.lower().endswith('password'):
+                        val = '<redacted>'
+                    self.log.debug('request header: %s: %s', key, val)
+            if isinstance(request.params, dict):
+                for key, val in sorted(request.params.iteritems()):
+                    if key.lower().endswith('password'):
+                        val = '<redacted>'
+                    self.log.debug('request param:  %s: %s', key, val)
+            if isinstance(request.data, dict):
+                for key, val in sorted(request.data.iteritems()):
+                    if key.lower().endswith('password'):
+                        val = '<redacted>'
+                    self.log.debug('request data:   %s: %s', key, val)
+            p_request.start_time = datetime.datetime.now()
+            return self.session.send(p_request, stream=True,
+                                     timeout=self.timeout)
+        else:
+            request = requests.Request(method=method, url=url, params=params,
+                                       data=data, headers=headers,
+                                       timeout=self.timeout)
+            if self.auth is not None:
+                self.auth(request)
+            request.session = self.session
+            # A hook lets us log all the info that requests adds right
+            # before sending
+            request.hooks = hooks
+            request.start_time = datetime.datetime.now()
+            request.send()
+            return request.response
 
 
 # Note that the hook this is meant to run as was removed from requests 1.
