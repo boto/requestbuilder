@@ -85,6 +85,11 @@ class HmacKeyAuth(BaseAuth):
         # If the current user/region was explicitly set (e.g. with --region),
         # use that first
         self.configure_from_configfile(only_if_explicit=True)
+        # Try the environment next
+        if 'AWS_ACCESS_KEY' in os.environ and not self.args.get('key_id'):
+            self.args['key_id'] = os.getenv('AWS_ACCESS_KEY')
+        if 'AWS_SECRET_KEY' in os.environ and not self.args.get('secret_key'):
+            self.args['secret_key'] = os.getenv('AWS_SECRET_KEY')
         # See if an AWS credential file was given in the environment
         self.configure_from_aws_credential_file()
         # Try the requestbuilder config file next
@@ -96,10 +101,6 @@ class HmacKeyAuth(BaseAuth):
             raise AuthError('missing secret key; please supply one with -S')
 
     def configure_from_aws_credential_file(self):
-        if 'AWS_ACCESS_KEY' in os.environ and not self.args.get('key_id'):
-            self.args['key_id'] = os.getenv('AWS_ACCESS_KEY')
-        if 'AWS_SECRET_KEY' in os.environ and not self.args.get('secret_key'):
-            self.args['secret_key'] = os.getenv('AWS_SECRET_KEY')
         if 'AWS_CREDENTIAL_FILE' in os.environ:
             path = os.getenv('AWS_CREDENTIAL_FILE')
             path = os.path.expandvars(path)
