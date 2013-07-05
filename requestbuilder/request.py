@@ -314,7 +314,7 @@ class AWSQueryRequest(BaseRequest):
                     flattened[prefixed_key] = item.read()
                 elif item or item == 0:
                     flattened[prefixed_key] = str(item)
-                elif val is EMPTY:
+                elif item is EMPTY:
                     flattened[prefixed_key] = ''
         else:
             raise TypeError('non-flattenable type: ' + args.__class__.__name__)
