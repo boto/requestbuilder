@@ -38,6 +38,20 @@ if '__file__' in globals():
         pass
 
 
+########## SINGLETONS ##########
+# Indicates a parameter that should be sent to the server without a value.
+# Contrast this with empty strings, with are omitted from requests entirely.
+EMPTY = type('EMPTY', (), {'__repr__': lambda self: "''",
+                           '__str__':  lambda self: ''})()
+
+# Getters used for arg routing
+AUTH    = operator.attrgetter('service.auth.args')
+PARAMS  = operator.attrgetter('params')
+SERVICE = operator.attrgetter('service.args')
+SESSION = operator.attrgetter('service.session_args')
+
+
+########## ARG CLASSES ##########
 class Arg(object):
     '''
     A command line argument.  Positional and keyword arguments to __init__
@@ -126,6 +140,8 @@ class Filter(object):
             msg = 'filter value {0} must match one of {1}'.format(
                     value, ', '.join([str(choice) for choice in self.choices]))
             raise argparse.ArgumentTypeError(msg)
+        if value == '':
+            value = EMPTY
         return (name, value)
 
 
@@ -137,14 +153,3 @@ class GenericTagFilter(Filter):
         return argval.startswith('tag:') and '=' in argval
 
 
-########## SINGLETONS ##########
-# Indicates a parameter that should be sent to the server without a value.
-# Contrast this with empty strings, with are omitted from requests entirely.
-EMPTY = type('EMPTY', (), {'__repr__': lambda self: "''",
-                           '__str__':  lambda self: ''})()
-
-# Getters used for arg routing
-AUTH    = operator.attrgetter('service.auth.args')
-PARAMS  = operator.attrgetter('params')
-SERVICE = operator.attrgetter('service.args')
-SESSION = operator.attrgetter('service.session_args')
