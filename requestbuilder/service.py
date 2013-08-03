@@ -234,6 +234,7 @@ class BaseService(object):
                     self.handle_http_error(response)
                 return response
         except requests.exceptions.ConnectionError as exc:
+            self.log.debug('connection error', exc_info=True)
             if len(exc.args) > 0 and hasattr(exc.args[0], 'reason'):
                 raise ClientError(exc.args[0].reason)
             else:
@@ -241,9 +242,11 @@ class BaseService(object):
         except requests.exceptions.HTTPError as exc:
             return self.handle_http_error(response)
         except requests.exceptions.RequestException as exc:
+            self.log.debug('request error', exc_info=True)
             raise ClientError(exc)
 
     def handle_http_error(self, response):
+        self.log.debug('HTTP error', exc_info=True)
         raise ServerError(response)
 
     def __log_and_send_request(self, method, url, params, data, headers):
