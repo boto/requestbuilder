@@ -125,9 +125,9 @@ class BaseRequest(BaseCommand):
         headers.setdefault('User-Agent', self.suite.get_user_agent())
         params  = self.prepare_params()
         try:
-            self.response = self.service.send_request(method=self.method,
-                    path=self.path, headers=headers, params=params,
-                    data=self.body)
+            self.response = self.service.send_request(
+                method=self.method, path=self.path, headers=headers,
+                params=params, data=self.body)
             return self.parse_response(self.response)
         except ServerError as err:
             self.response = err.response

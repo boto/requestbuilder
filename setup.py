@@ -15,11 +15,7 @@
 from distutils.command.build_py import build_py
 from distutils.command.sdist import sdist
 import os.path
-
-try:
-    from setuptools import setup
-except ImportError:
-    from distutils.core import setup
+from setuptools import find_packages, setup
 
 from requestbuilder import __version__
 
@@ -66,28 +62,25 @@ class sdist_with_git_version(sdist):
         os.rename(new_init_name, old_init_name)
 
 
-setup(name = 'requestbuilder',
-      version = __version__,
-      description = 'Command line-driven HTTP request builder',
-      author = 'Garrett Holmstrom (gholms)',
-      author_email = 'gholms@devzero.com',
-      packages = ['requestbuilder',
-                  'requestbuilder.commands',
-                 ],
-      license = 'ISC',
-      platforms = 'Posix; MacOS X',
-      classifiers = ['Development Status :: 3 - Alpha',
-                     'Intended Audience :: Developers',
-                     'License :: OSI Approved :: ISC License (ISCL)',
-                     'Programming Language :: Python',
-                     'Programming Language :: Python :: 2',
-                     'Programming Language :: Python :: 2.6',
-                     'Programming Language :: Python :: 2.7',
-                     'Topic :: Internet'],
-      install_requires = [
-          "argparse",
-          "requests",
-          "six",
-      ],
-      cmdclass = {'build_py': build_py_with_git_version,
-                  'sdist': sdist_with_git_version})
+setup(name='requestbuilder',
+      version=__version__,
+      description='Command line-driven HTTP request builder',
+      author='Garrett Holmstrom (gholms)',
+      author_email='gholms@devzero.com',
+      packages=find_packages(),
+      install_requires=['argparse',
+                        'requests',
+                        'six'],
+      license='ISC',
+      platforms='Posix; MacOS X',
+      classifiers=['Development Status :: 3 - Alpha',
+                   'Intended Audience :: Developers',
+                   'License :: OSI Approved :: ISC License (ISCL)',
+                   'Operating System :: OS Independent',
+                   'Programming Language :: Python',
+                   'Programming Language :: Python :: 2',
+                   'Programming Language :: Python :: 2.6',
+                   'Programming Language :: Python :: 2.7',
+                   'Topic :: Internet'],
+      cmdclass={'build_py': build_py_with_git_version,
+                'sdist': sdist_with_git_version})

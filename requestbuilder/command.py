@@ -223,13 +223,14 @@ class BaseCommand(object):
         # Everything goes in self.args.  distribute_args() also puts them
         # elsewhere later on in the process.
         self.args.update(cli_args)
+        redacted = type('REDACTED', (),
+                        {'__repr__': lambda self: '<redacted>'})()
         for key in list(cli_args.keys()):
             if (('password' in key.lower() or 'secret' in key.lower()) and
                 cli_args[key] is not None):
                 # This makes it slightly more obvious that this is redacted by
                 # the framework and not just a string by removing quotes.
-                cli_args[key] = type('REDACTED', (),
-                    {'__repr__': lambda self: '<redacted>'})()
+                cli_args[key] = redacted
         self.log.debug('parsed arguments: ' + str(cli_args))
 
     def distribute_args(self):
