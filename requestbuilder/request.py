@@ -131,17 +131,16 @@ class BaseRequest(BaseCommand):
             return self.parse_response(self.response)
         except ServerError as err:
             self.response = err.response
-            return self.handle_server_error(err)
-        finally:
-            # Empty the socket buffer so it can be reused
-            ## TODO:  is this a good idea?  We might be forced to download lots
-            ##        of data on error.
             try:
+                # Empty the socket buffer so it can be reused.
+                # Hopefully error responses won't be too large for this to be
+                # problematic.
                 if self.response is not None:
                     self.response.content
             except RuntimeError:
                 # The content was already consumed
                 pass
+            return self.handle_server_error(err)
 
     def handle_server_error(self, err):
         self.log.debug('-- response content --\n',
