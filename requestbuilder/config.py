@@ -205,9 +205,9 @@ class Config(object):
 def convert_to_bool(value, default=None):
     if value is None:
         return default
-    elif value.lower() in ('true', '1', 'yes', 'on'):
+    elif str(value).lower() in ('true', '1', 'yes', 'on'):
         return True
-    elif value.lower() in ('false', '0', 'no', 'off'):
+    elif str(value).lower() in ('false', '0', 'no', 'off'):
         return False
     else:
         raise ValueError('value {0} is not boolean'.format(repr(value)))
