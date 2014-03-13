@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2013, Eucalyptus Systems, Inc.
+# Copyright (c) 2012-2014, Eucalyptus Systems, Inc.
 #
 # Permission to use, copy, modify, and/or distribute this software for
 # any purpose with or without fee is hereby granted, provided that the
@@ -18,15 +18,15 @@ import argparse
 from functools import partial
 import logging
 import os.path
-import platform
+import sys
+import textwrap
+
 from requestbuilder import EMPTY, PARAMS
+from requestbuilder.auth import BaseAuth
 from requestbuilder.command import BaseCommand
 from requestbuilder.exceptions import ServerError
 from requestbuilder.service import BaseService
-from requestbuilder.util import aggregate_subclass_fields
 from requestbuilder.xmlparse import parse_listdelimited_aws_xml
-import sys
-import textwrap
 
 
 class BaseRequest(BaseCommand):
@@ -64,6 +64,7 @@ class BaseRequest(BaseCommand):
     '''
 
     SERVICE_CLASS = BaseService
+    AUTH_CLASS    = BaseAuth
     NAME          = None
     METHOD        = 'GET'
 
@@ -71,7 +72,8 @@ class BaseRequest(BaseCommand):
     LIST_TAGS = []
 
 
-    def __init__(self, service=None, **kwargs):
+    def __init__(self, service=None, auth=None, **kwargs):
+        self.auth = auth
         self.service = service
         # Parts of the HTTP request to be sent to the server.
         self.method    = self.METHOD
@@ -88,23 +90,28 @@ class BaseRequest(BaseCommand):
         BaseCommand.__init__(self, **kwargs)
 
     def _post_init(self):
-        if self.service is None:
+        if self.service is None and self.SERVICE_CLASS is not None:
             self.service = self.SERVICE_CLASS(self.config,
                                               loglevel=self.log.level)
+        if self.auth is None and self.AUTH_CLASS is not None:
+            self.auth = self.AUTH_CLASS(self.config, loglevel=self.log.level)
         BaseCommand._post_init(self)
 
     def collect_arg_objs(self):
-        request_args = BaseCommand.collect_arg_objs(self)
-        service_args = self.service.collect_arg_objs()
-        # Note that the service is likely to include auth args as well.
-        return request_args + service_args
-
-    def preprocess_arg_objs(self, arg_objs):
-        self.service.preprocess_arg_objs(arg_objs)
+        arg_objs = BaseCommand.collect_arg_objs(self)
+        if self.service is not None:
+            arg_objs.extend(self.service.collect_arg_objs())
+        if self.auth is not None:
+            arg_objs.extend(self.auth.collect_arg_objs())
+        return arg_objs
 
     def configure(self):
         BaseCommand.configure(self)
-        self.service.configure()
+        if self.service is not None:
+            self.service.configure()
+        if self.auth is not None:
+            self.auth.endpoint = self.service.endpoint  # FIXME
+            self.auth.configure()
         self.__configured = True
 
     @property
@@ -127,7 +134,7 @@ class BaseRequest(BaseCommand):
         try:
             self.response = self.service.send_request(
                 method=self.method, path=self.path, headers=headers,
-                params=params, data=self.body)
+                params=params, data=self.body, auth=self.auth)
             return self.parse_response(self.response)
         except ServerError as err:
             self.response = err.response
@@ -286,19 +293,19 @@ class AWSQueryRequest(BaseRequest):
         elif isinstance(args, dict):
             for (key, val) in args.iteritems():
                 # Prefix.Key1, Prefix.Key2, ...
-                    if prefix:
-                        prefixed_key = prefix + '.' + str(key)
-                    else:
-                        prefixed_key = str(key)
+                if prefix:
+                    prefixed_key = prefix + '.' + str(key)
+                else:
+                    prefixed_key = str(key)
 
-                    if isinstance(val, dict) or isinstance(val, list):
-                        flattened.update(self.flatten_params(val, prefixed_key))
-                    elif isinstance(val, file):
-                        flattened[prefixed_key] = val.read()
-                    elif val or val is 0:
-                        flattened[prefixed_key] = str(val)
-                    elif val is EMPTY:
-                        flattened[prefixed_key] = ''
+                if isinstance(val, dict) or isinstance(val, list):
+                    flattened.update(self.flatten_params(val, prefixed_key))
+                elif isinstance(val, file):
+                    flattened[prefixed_key] = val.read()
+                elif val or val is 0:
+                    flattened[prefixed_key] = str(val)
+                elif val is EMPTY:
+                    flattened[prefixed_key] = ''
         elif isinstance(args, list):
             for (i_item, item) in enumerate(args, 1):
                 # Prefix.1, Prefix.2, ...
@@ -333,7 +340,7 @@ class AWSQueryRequest(BaseRequest):
         helplines = ['allowed filter names:']
         for filter_obj in self.FILTERS:
             if filter_obj.help:
-                first, __, rest = filter_obj.help.partition('\n')
+                first, _, rest = filter_obj.help.partition('\n')
                 if rest.startswith(' ') and not first.startswith(' '):
                     # First line is not uniformly indented
                     content = first + ' ' + textwrap.dedent(rest)
@@ -409,7 +416,7 @@ class _IteratorFileObjAdapter(object):
 
     def close(self):
         if not self._closed:
-            self.buflist = None
+            self._buflist = None
             self._closed = True
 
     def read(self, size=-1):

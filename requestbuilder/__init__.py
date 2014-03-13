@@ -45,7 +45,7 @@ EMPTY = type('EMPTY', (), {'__repr__': lambda self: "''",
                            '__str__':  lambda self: ''})()
 
 # Getters used for arg routing
-AUTH    = operator.attrgetter('service.auth.args')
+AUTH    = operator.attrgetter('auth.args')
 PARAMS  = operator.attrgetter('params')
 SERVICE = operator.attrgetter('service.args')
 SESSION = operator.attrgetter('service.session_args')

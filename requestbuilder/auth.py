@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2013, Eucalyptus Systems, Inc.
+# Copyright (c) 2012-2014, Eucalyptus Systems, Inc.
 #
 # Permission to use, copy, modify, and/or distribute this software for
 # any purpose with or without fee is hereby granted, provided that the
@@ -14,7 +14,6 @@
 
 from __future__ import absolute_import
 
-import argparse
 import base64
 import email.utils
 import hashlib
@@ -22,13 +21,14 @@ import hmac
 import os
 import logging
 import re
-from requestbuilder import Arg, AUTH
-from requestbuilder.exceptions import AuthError
-from requestbuilder.util import add_default_routes, aggregate_subclass_fields
 import six
 import time
 import urllib
 import urlparse
+
+from requestbuilder import Arg, AUTH
+from requestbuilder.exceptions import AuthError
+from requestbuilder.util import add_default_routes, aggregate_subclass_fields
 
 ISO8601 = '%Y-%m-%dT%H:%M:%SZ'
 
@@ -148,6 +148,10 @@ class S3RestAuth(HmacKeyAuth):
             'torrent', 'uploadId', 'uploads', 'versionId', 'versioning',
             'versions', 'website'))
 
+    def __init__(self, *args, **kwargs):
+        self.endpoint = None
+        HmacKeyAuth.__init__(self, *args, **kwargs)
+
     def __call__(self, req):
         if req.headers is None:
             req.headers = {}
@@ -173,8 +177,8 @@ class S3RestAuth(HmacKeyAuth):
     def get_canonicalized_resource(self, req):
         # /bucket/keyname
         parsed_req_path = urlparse.urlparse(req.url).path
-        assert self.service.endpoint is not None
-        parsed_svc_path = urlparse.urlparse(self.service.endpoint).path
+        assert self.endpoint is not None
+        parsed_svc_path = urlparse.urlparse(self.endpoint).path
         # IMPORTANT:  this only supports path-style requests
         assert parsed_req_path.startswith(parsed_svc_path)
         resource = parsed_req_path[len(parsed_svc_path):]

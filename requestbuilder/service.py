@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2013, Eucalyptus Systems, Inc.
+# Copyright (c) 2012-2014, Eucalyptus Systems, Inc.
 #
 # Permission to use, copy, modify, and/or distribute this software for
 # any purpose with or without fee is hereby granted, provided that the
@@ -14,22 +14,21 @@
 
 from __future__ import absolute_import
 
-import copy
 import datetime
 import functools
 import logging
 import os.path
 import random
+import time
+import urlparse
+
+import requests.exceptions
+
 from requestbuilder import SERVICE
 from requestbuilder.exceptions import (ClientError, ServerError,
     ServiceInitError)
 from requestbuilder.util import (add_default_routes, aggregate_subclass_fields,
     set_userregion)
-import requests.exceptions
-import time
-import urlparse
-import weakref
-
 
 
 class BaseService(object):
@@ -39,15 +38,14 @@ class BaseService(object):
     MAX_RETRIES = 2
     TIMEOUT = 30  # socket timeout in seconds
 
-    AUTH_CLASS = None
     REGION_ENVVAR = None
     URL_ENVVAR = None
 
     ARGS = []
     DEFAULT_ROUTES = (SERVICE,)
 
-    def __init__(self, config, auth=None, loglevel=None, max_retries=None,
-                 timeout=None, **kwargs):
+    def __init__(self, config, loglevel=None, max_retries=None, timeout=None,
+                 **kwargs):
         self.args      = kwargs
         self.config    = config
         self.endpoint  = None
@@ -59,15 +57,6 @@ class BaseService(object):
         self.timeout = timeout
         self._session = None
 
-        if auth is not None:
-            self.auth = auth
-            self.auth.service = weakref.proxy(self)
-        elif self.AUTH_CLASS is not None:
-            self.auth = self.AUTH_CLASS(self.config, loglevel=self.log.level)
-            self.auth.service = weakref.proxy(self)
-        else:
-            self.auth = None
-
     @property
     def region_name(self):
         # FIXME:  this makes it impossible for services in different regions
@@ -75,17 +64,12 @@ class BaseService(object):
         return self.config.get_region()
 
     def collect_arg_objs(self):
-        service_args = aggregate_subclass_fields(self.__class__, 'ARGS')
-        add_default_routes(service_args, self.DEFAULT_ROUTES)
-        if self.auth is not None:
-            auth_args = self.auth.collect_arg_objs()
-        else:
-            auth_args = []
-        return service_args + auth_args
+        arg_objs = aggregate_subclass_fields(self.__class__, 'ARGS')
+        add_default_routes(arg_objs, self.DEFAULT_ROUTES)
+        return arg_objs
 
     def preprocess_arg_objs(self, arg_objs):
-        if self.auth is not None:
-            self.auth.preprocess_arg_objs(arg_objs)
+        pass
 
     def configure(self):
         # self.args gets highest precedence for self.endpoint and user/region
@@ -118,8 +102,6 @@ class BaseService(object):
 
         # Ensure everything is okay and finish up
         self.validate_config()
-        if self.auth is not None:
-            self.auth.configure()
 
     @property
     def session(self):
@@ -165,7 +147,7 @@ class BaseService(object):
             set_userregion(self.config, userregion)
 
     def send_request(self, method='GET', path=None, params=None, headers=None,
-                     data=None):
+                     data=None, auth=None):
         ## TODO:  test url-encoding
         if path:
             # We can't simply use urljoin because a path might start with '/'
@@ -201,7 +183,7 @@ class BaseService(object):
                     self.log.info('sending request (attempt %i of %i)',
                                   attempt_no, max_tries)
                     response = self.__log_and_send_request(method, url, params,
-                                                           data, headers)
+                                                           data, headers, auth)
                     if response.status_code not in (500, 503):
                         break
                     # If it *was* in that list, retry
@@ -249,7 +231,7 @@ class BaseService(object):
         self.log.debug('HTTP error', exc_info=True)
         raise ServerError(response)
 
-    def __log_and_send_request(self, method, url, params, data, headers):
+    def __log_and_send_request(self, method, url, params, data, headers, auth):
         # Requests 1 gives auth handlers PreparedRequests instead of the
         # original Requests like version 0 does.  Since most of our auth
         # handlers inspect and/or modify things that aren't headers, we
@@ -263,8 +245,8 @@ class BaseService(object):
             request = requests.Request(method=method, url=url,
                                        params=params, data=data,
                                        headers=headers)
-            if self.auth is not None:
-                self.auth(request)
+            if auth is not None:
+                auth(request)
             # A prepared request gives us extra info we want to log
             p_request = request.prepare()
             p_request.hooks = {'response': hooks['response']}
@@ -292,8 +274,8 @@ class BaseService(object):
             request = requests.Request(method=method, url=url, params=params,
                                        data=data, headers=headers,
                                        timeout=self.timeout)
-            if self.auth is not None:
-                self.auth(request)
+            if auth is not None:
+                auth(request)
             request.session = self.session
             # A hook lets us log all the info that requests adds right
             # before sending
@@ -325,9 +307,10 @@ def _log_request_data(logger, request, **kwargs):
 
 
 def _log_response_data(logger, response, **kwargs):
-    duration = datetime.datetime.now() - response.request.start_time
-    logger.debug('response time: %i.%03i seconds', duration.seconds,
-                 duration.microseconds // 1000)
+    if hasattr(response.request, 'start_time'):
+        duration = datetime.datetime.now() - response.request.start_time
+        logger.debug('response time: %i.%03i seconds', duration.seconds,
+                     duration.microseconds // 1000)
     if response.status_code >= 400:
         logger.error('response status: %i', response.status_code)
     else:
