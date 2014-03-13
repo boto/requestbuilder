@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2013, Eucalyptus Systems, Inc.
+# Copyright (c) 2012-2014, Eucalyptus Systems, Inc.
 #
 # Permission to use, copy, modify, and/or distribute this software for
 # any purpose with or without fee is hereby granted, provided that the
@@ -18,7 +18,7 @@ import os.path
 import subprocess
 
 
-__version__ = '0.1.0'
+__version__ = '0.2.0-dev'
 
 if '__file__' in globals():
     # Check if this is a git repo; maybe we can get more precise version info
