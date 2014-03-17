@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2013, Eucalyptus Systems, Inc.
+# Copyright (c) 2012-2014, Eucalyptus Systems, Inc.
 #
 # Permission to use, copy, modify, and/or distribute this software for
 # any purpose with or without fee is hereby granted, provided that the
@@ -21,18 +21,17 @@ import os.path
 import sys
 import textwrap
 import traceback
-
 try:
     import epdb
 except ImportError:
     import pdb
 
-from . import Arg, MutuallyExclusiveArgList
-from .config import Config
-from .exceptions import ArgumentError
-from .logging import configure_root_logger
-from .suite import RequestBuilder
-from .util import add_default_routes, aggregate_subclass_fields
+from requestbuilder import Arg, MutuallyExclusiveArgList
+from requestbuilder.config import ConfigData, ConfigView
+from requestbuilder.exceptions import ArgumentError
+from requestbuilder.logging import configure_root_logger
+from requestbuilder.suite import RequestBuilder
+from requestbuilder.util import add_default_routes, aggregate_subclass_fields
 
 class BaseCommand(object):
     '''
@@ -128,11 +127,13 @@ class BaseCommand(object):
     def _process_configfiles(self):
         if self.config is None:
             config_files = self.suite.list_config_files()
-            self.config = Config(config_files, loglevel=self.log.level)
+            config_data = ConfigData(config_files)
+            self.config = ConfigView(config_data)
         # Now that we have a config file we should check to see if it wants
         # us to turn on debugging
         if self.__config_enables_debugging():
             self.log.setLevel(logging.DEBUG)
+            self.config.log.setLevel(logging.DEBUG)
 
     def _configure_global_logging(self):
         if self.config.get_global_option('debug') in ('color', 'colour'):
@@ -147,7 +148,6 @@ class BaseCommand(object):
                 formatter_class=argparse.RawDescriptionHelpFormatter,
                 usage=self.USAGE, add_help=False)
         arg_objs = self.collect_arg_objs()
-        self.preprocess_arg_objs(arg_objs)
         self.populate_parser(parser, arg_objs)
         # Low-level basic args that affect the core of the framework
         # These don't actually show up once CLI args finish processing.
@@ -175,9 +175,6 @@ class BaseCommand(object):
         arg_objs = aggregate_subclass_fields(self.__class__, 'ARGS')
         add_default_routes(arg_objs, self.DEFAULT_ROUTES)
         return arg_objs
-
-    def preprocess_arg_objs(self, arg_objs):
-        pass
 
     def populate_parser(self, parser, arg_objs):
         for arg_obj in arg_objs:
@@ -345,9 +342,10 @@ class BaseCommand(object):
         if self.config is None:
             return False
         if self.config.get_global_option('debug') in ('color', 'colour'):
-            # It isn't boolean, but still counts as true.
             return True
-        return self.config.get_global_option_bool('debug', False)
+        if self.config.convert_to_bool(self.config.get_global_option('debug')):
+            return True
+        return False
 
 
 def _debugger_except_hook(type_, value, tracebk):

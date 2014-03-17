@@ -1,4 +1,4 @@
-# Copyright (c) 2013, Eucalyptus Systems, Inc.
+# Copyright (c) 2013-2014, Eucalyptus Systems, Inc.
 #
 # Permission to use, copy, modify, and/or distribute this software for
 # any purpose with or without fee is hereby granted, provided that the
@@ -12,10 +12,8 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
 # OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-import platform
 import requestbuilder
-import requests
-import sys
+import warnings
 
 
 def add_default_routes(arglike_obj, default_routes):
@@ -40,6 +38,10 @@ def aggregate_subclass_fields(cls, field_name):
 
 
 def set_userregion(config, userregion, overwrite=False):
+    msg = ('set_userregion is deprecated; use '
+           'RegionConfigurableMixin.update_config_view instead')
+    config.log.warn(msg)
+    warnings.warn(msg, DeprecationWarning)
     if userregion is None:
         return
     if '@' in userregion:
@@ -47,8 +49,8 @@ def set_userregion(config, userregion, overwrite=False):
     else:
         user = None
         region = userregion
-    if user and (config.current_user is None or overwrite):
-        config.current_user = user
-    if region and (config.current_region is None or overwrite):
-        config.current_region = region
+    if user and (config.user is None or overwrite):
+        config.user = user
+    if region and (config.region is None or overwrite):
+        config.region = region
     return user, region

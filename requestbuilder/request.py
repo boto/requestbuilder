@@ -20,12 +20,13 @@ import logging
 import os.path
 import sys
 import textwrap
+import warnings
 
 from requestbuilder import EMPTY, PARAMS
-from requestbuilder.auth import BaseAuth
 from requestbuilder.command import BaseCommand
 from requestbuilder.exceptions import ServerError
 from requestbuilder.service import BaseService
+from requestbuilder.util import aggregate_subclass_fields
 from requestbuilder.xmlparse import parse_listdelimited_aws_xml
 
 
@@ -64,7 +65,7 @@ class BaseRequest(BaseCommand):
     '''
 
     SERVICE_CLASS = BaseService
-    AUTH_CLASS    = BaseAuth
+    AUTH_CLASS    = None
     NAME          = None
     METHOD        = 'GET'
 
@@ -93,24 +94,42 @@ class BaseRequest(BaseCommand):
         if self.service is None and self.SERVICE_CLASS is not None:
             self.service = self.SERVICE_CLASS(self.config,
                                               loglevel=self.log.level)
-        if self.auth is None and self.AUTH_CLASS is not None:
-            self.auth = self.AUTH_CLASS(self.config, loglevel=self.log.level)
+        if self.auth is None:
+            if self.AUTH_CLASS is not None:
+                self.auth = self.AUTH_CLASS(self.config,
+                                            loglevel=self.log.level)
+            elif self.SERVICE_CLASS.AUTH_CLASS is not None:
+                # Backward compatibility
+                msg = ('BaseService.AUTH_CLASS is deprecated; use '
+                       'BaseRequest.AUTH_CLASS instead')
+                self.log.warn(msg)
+                warnings.warn(msg, DeprecationWarning)
+                self.auth = self.SERVICE_CLASS.AUTH_CLASS(
+                    self.config, loglevel=self.log.level)
         BaseCommand._post_init(self)
 
     def collect_arg_objs(self):
         arg_objs = BaseCommand.collect_arg_objs(self)
         if self.service is not None:
-            arg_objs.extend(self.service.collect_arg_objs())
+            arg_objs.extend(
+                aggregate_subclass_fields(self.service.__class__, 'ARGS'))
         if self.auth is not None:
-            arg_objs.extend(self.auth.collect_arg_objs())
+            arg_objs.extend(
+                aggregate_subclass_fields(self.auth.__class__, 'ARGS'))
         return arg_objs
+
+    def distribute_args(self):
+        BaseCommand.distribute_args(self)
+        if self.service is not None:
+            self.service.args.update(self.args)
+        if self.auth is not None:
+            self.auth.args.update(self.args)
 
     def configure(self):
         BaseCommand.configure(self)
         if self.service is not None:
             self.service.configure()
         if self.auth is not None:
-            self.auth.endpoint = self.service.endpoint  # FIXME
             self.auth.configure()
         self.__configured = True
 

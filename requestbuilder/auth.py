@@ -26,9 +26,8 @@ import time
 import urllib
 import urlparse
 
-from requestbuilder import Arg, AUTH
+from requestbuilder import Arg
 from requestbuilder.exceptions import AuthError
-from requestbuilder.util import add_default_routes, aggregate_subclass_fields
 
 ISO8601 = '%Y-%m-%dT%H:%M:%SZ'
 
@@ -41,36 +40,18 @@ class BaseAuth(object):
     necessary functions to effect an authentication scheme.
     '''
     ARGS = []
-    DEFAULT_ROUTES = (AUTH,)
 
     def __init__(self, config, loglevel=None, **kwargs):
         self.args    = kwargs
         self.config  = config
-        # Auth handlers are much more tightly coupled with their associated
-        # services.  Since some of them need to have access to stuff like
-        # endpoint URLs and region names the service will automatically give
-        # the auth handler a weak reference to itself when it creates the auth
-        # handler itself or when you pass it to the service's __init__ method.
-        # Be aware of this when you set the service's auth attribute by hand --
-        # you may need to point it at the service for it to function properly.
-        self.service = None
-
         self.log = logging.getLogger(self.__class__.__name__)
         if loglevel is not None:
             self.log.level = loglevel
 
-    def collect_arg_objs(self):
-        arg_objs = aggregate_subclass_fields(self.__class__, 'ARGS')
-        add_default_routes(arg_objs, self.DEFAULT_ROUTES)
-        return arg_objs
-
-    def preprocess_arg_objs(self, arg_objs):
-        pass
-
     def configure(self):
         pass
 
-    def __call__(self, req):
+    def apply_to_request(self, request, service):
         pass
 
 
@@ -121,8 +102,8 @@ class HmacKeyAuth(BaseAuth):
                             self.args['secret_key'] = val.strip()
 
     def configure_from_configfile(self, only_if_explicit=False):
-        if (only_if_explicit and self.config.current_user is None and
-            self.config.current_region is None):
+        if (only_if_explicit and self.config.user is None and
+                self.config.region is None):
             # The current user/region were not explicitly set, so do nothing.
             return
         if not self.args.get('key_id'):
@@ -148,11 +129,7 @@ class S3RestAuth(HmacKeyAuth):
             'torrent', 'uploadId', 'uploads', 'versionId', 'versioning',
             'versions', 'website'))
 
-    def __init__(self, *args, **kwargs):
-        self.endpoint = None
-        HmacKeyAuth.__init__(self, *args, **kwargs)
-
-    def __call__(self, req):
+    def apply_to_request(self, req, service):
         if req.headers is None:
             req.headers = {}
         req.headers['Date'] = email.utils.formatdate()
@@ -161,7 +138,7 @@ class S3RestAuth(HmacKeyAuth):
             del req.headers['Signature']
         c_headers = self.get_canonicalized_headers(req)
         self.log.debug('canonicalized_headers: %s', repr(c_headers))
-        c_resource = self.get_canonicalized_resource(req)
+        c_resource = self.get_canonicalized_resource(req, service)
         self.log.debug('canonicalized resource: %s', repr(c_resource))
         to_sign = '\n'.join((req.method.upper(),
                              req.headers.get('Content-MD5', ''),
@@ -174,11 +151,11 @@ class S3RestAuth(HmacKeyAuth):
         req.headers['Authorization'] = 'AWS {0}:{1}'.format(self.args['key_id'],
                                                             signature)
 
-    def get_canonicalized_resource(self, req):
+    def get_canonicalized_resource(self, req, service):
         # /bucket/keyname
         parsed_req_path = urlparse.urlparse(req.url).path
-        assert self.endpoint is not None
-        parsed_svc_path = urlparse.urlparse(self.endpoint).path
+        assert service.endpoint is not None
+        parsed_svc_path = urlparse.urlparse(service.endpoint).path
         # IMPORTANT:  this only supports path-style requests
         assert parsed_req_path.startswith(parsed_svc_path)
         resource = parsed_req_path[len(parsed_svc_path):]
@@ -201,7 +178,8 @@ class S3RestAuth(HmacKeyAuth):
                     resource += '?' + '&'.join(subresources)
         return resource
 
-    def get_canonicalized_headers(self, req):
+    @staticmethod
+    def get_canonicalized_headers(req):
         headers_dict = {}
         for key, val in req.headers.iteritems():
             if key.lower().startswith('x-amz-'):
@@ -227,7 +205,7 @@ class QuerySigV2Auth(HmacKeyAuth):
     http://docs.amazonwebservices.com/general/latest/gr/signature-version-2.html
     '''
 
-    def __call__(self, req):
+    def apply_to_request(self, req, service):
         if req.params is None:
             req.params = {}
         req.params['AWSAccessKeyId']   = self.args['key_id']

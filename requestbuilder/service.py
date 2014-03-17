@@ -24,25 +24,24 @@ import urlparse
 
 import requests.exceptions
 
-from requestbuilder import SERVICE
 from requestbuilder.exceptions import (ClientError, ServerError,
-    ServiceInitError)
-from requestbuilder.util import (add_default_routes, aggregate_subclass_fields,
-    set_userregion)
+                                       ServiceInitError)
+from requestbuilder.mixins import RegionConfigurableMixin
+from requestbuilder.util import add_default_routes, aggregate_subclass_fields
 
 
-class BaseService(object):
+class BaseService(RegionConfigurableMixin):
     NAME = None
     DESCRIPTION = ''
     API_VERSION = ''
     MAX_RETRIES = 2
     TIMEOUT = 30  # socket timeout in seconds
+    AUTH_CLASS = None  # deprecated; use BaseRequest.AUTH_CLASS instead
 
     REGION_ENVVAR = None
     URL_ENVVAR = None
 
     ARGS = []
-    DEFAULT_ROUTES = (SERVICE,)
 
     def __init__(self, config, loglevel=None, max_retries=None, timeout=None,
                  **kwargs):
@@ -53,34 +52,16 @@ class BaseService(object):
         if loglevel is not None:
             self.log.level = loglevel
         self.max_retries = max_retries
+        self.region_name = None  # Note this can differ from config.region
         self.session_args = {}
         self.timeout = timeout
         self._session = None
 
-    @property
-    def region_name(self):
-        # FIXME:  this makes it impossible for services in different regions
-        # to share configuration.
-        return self.config.get_region()
-
-    def collect_arg_objs(self):
-        arg_objs = aggregate_subclass_fields(self.__class__, 'ARGS')
-        add_default_routes(arg_objs, self.DEFAULT_ROUTES)
-        return arg_objs
-
-    def preprocess_arg_objs(self, arg_objs):
-        pass
-
     def configure(self):
-        # self.args gets highest precedence for self.endpoint and user/region
-        self.process_url(self.args.get('url'))
-        set_userregion(self.config, self.args.get('userregion'))
-        # Environment comes next
-        set_userregion(self.config, os.getenv(self.REGION_ENVVAR))
-        self.process_url(os.getenv(self.URL_ENVVAR))
-        # Finally, try the config file
-        if self.NAME is not None:
-            self.process_url(self.config.get_region_option(self.NAME + '-url'))
+        # Configure user and region before grabbing endpoint info since
+        # the latter may depend upon the former
+        self.update_config_view()
+        self.__configure_endpoint()
 
         # Configure timeout and retry handlers
         if self.max_retries is None:
@@ -97,8 +78,8 @@ class BaseService(object):
                 self.timeout = self.TIMEOUT
 
         # SSL cert verification is opt-in
-        self.session_args['verify'] = self.config.get_region_option_bool(
-            'verify-ssl', default=False)
+        self.session_args['verify'] = self.config.convert_to_bool(
+            self.config.get_region_option('verify-ssl'), default=False)
 
         # Ensure everything is okay and finish up
         self.validate_config()
@@ -118,10 +99,7 @@ class BaseService(object):
         if self.endpoint is None:
             if self.NAME is not None:
                 url_opt = '{0}-url'.format(self.NAME)
-                available_regions = []
-                for rname, rconfig in self.config.regions.iteritems():
-                    if url_opt in rconfig and '*' not in rname:
-                        available_regions.append(rname)
+                available_regions = self.config.get_all_region_options(url_opt)
                 if len(available_regions) > 0:
                     msg = ('No {0} endpoint to connect to was given. '
                            'Configured regions with {0} endpoints are: '
@@ -134,17 +112,6 @@ class BaseService(object):
             else:
                 msg = 'No endpoint to connect to was given'
             raise ServiceInitError(msg)
-
-    def process_url(self, url):
-        if url:
-            if '::' in url:
-                userregion, endpoint = url.split('::', 1)
-            else:
-                endpoint = url
-                userregion = None
-            if self.endpoint is None:
-                self.endpoint = endpoint
-            set_userregion(self.config, userregion)
 
     def send_request(self, method='GET', path=None, params=None, headers=None,
                      data=None, auth=None):
@@ -160,7 +127,7 @@ class BaseService(object):
             url = self.endpoint
 
         headers = dict(headers)
-        if 'host' not in map(str.lower, headers.iterkeys()):
+        if 'host' not in [header.lower() for header in headers]:
             headers['Host'] = urlparse.urlparse(self.endpoint).netloc
 
         try:
@@ -246,7 +213,7 @@ class BaseService(object):
                                        params=params, data=data,
                                        headers=headers)
             if auth is not None:
-                auth(request)
+                auth.apply_to_request(request, self)
             # A prepared request gives us extra info we want to log
             p_request = request.prepare()
             p_request.hooks = {'response': hooks['response']}
@@ -275,7 +242,7 @@ class BaseService(object):
                                        data=data, headers=headers,
                                        timeout=self.timeout)
             if auth is not None:
-                auth(request)
+                auth.apply_to_request(request, self)
             request.session = self.session
             # A hook lets us log all the info that requests adds right
             # before sending
@@ -284,9 +251,30 @@ class BaseService(object):
             request.send()
             return request.response
 
+    def __configure_endpoint(self):
+        # self.args gets highest precedence
+        if self.args.get('url'):
+            url, region_name = _parse_endpoint_url(self.args['url'])
+        # Environment comes next
+        elif os.getenv(self.URL_ENVVAR):
+            url, region_name = _parse_endpoint_url(self.args['url'])
+        # Try the config file
+        elif self.NAME:
+            url, section = self.config.get_region_option2(self.NAME + '-url')
+            if section:
+                # Check to see if the region name is explicitly specified
+                region_name = self.config.get_region_option('name', section)
+                if region_name is None:
+                    # If it isn't then just grab the end of the section name
+                    region_name = section.rsplit(':', 1)[-1]
+            else:
+                region_name = None
+        self.endpoint = url
+        self.region_name = region_name
+
 
 # Note that the hook this is meant to run as was removed from requests 1.
-def _log_request_data(logger, request, **kwargs):
+def _log_request_data(logger, request, **_):
     logger.debug('request method: %s', request.method)
     logger.debug('request url:    %s', request.full_url)
     if isinstance(request.headers, dict):
@@ -306,7 +294,7 @@ def _log_request_data(logger, request, **kwargs):
             logger.debug('request data:   %s: %s', key, val)
 
 
-def _log_response_data(logger, response, **kwargs):
+def _log_response_data(logger, response, **_):
     if hasattr(response.request, 'start_time'):
         duration = datetime.datetime.now() - response.request.start_time
         logger.debug('response time: %i.%03i seconds', duration.seconds,
@@ -326,3 +314,18 @@ def _generate_delays(max_tries):
         for retry_no in range(1, max_tries):
             next_delay = (random.random() + 1) * 2 ** (retry_no - 1)
             yield min((next_delay, 15))
+
+
+def _parse_endpoint_url(urlish):
+    """
+    If given a URL, return the URL and None.  If given a URL with a string and
+    "::" prepended to it, return the URL and the prepended string.  This is
+    meant to give one a means to supply a region name via arguments and
+    variables that normally only accept URLs.
+    """
+    if '::' in urlish:
+        region, url = urlish.split('::', 1)
+    else:
+        region = None
+        url = urlish
+    return url, region
