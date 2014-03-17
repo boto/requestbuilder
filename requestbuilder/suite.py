@@ -65,12 +65,7 @@ class RequestBuilder(object):
                 tokens.append(' '.join(plat))
             tokens.append(platform.machine())
             user_agent.append('({0})'.format('; '.join(tokens)))
-
-            try:
-                # This should always work; I'm just being paranoid.
-                user_agent.append('requests/{0}'.format(requests.__version__))
-            except:
-                pass
+            user_agent.append('requests/{0}'.format(requests.__version__))
 
             self.__user_agent = ' '.join(user_agent)
         return self.__user_agent

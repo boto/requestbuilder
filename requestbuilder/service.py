@@ -87,12 +87,9 @@ class BaseService(RegionConfigurableMixin):
     @property
     def session(self):
         if self._session is None:
-            if requests.__version__ >= '1.0':
-                self._session = requests.session()
-                for key, val in self.session_args.iteritems():
-                    setattr(self._session, key, val)
-            else:
-                self._session = requests.session(**self.session_args)
+            self._session = requests.session()
+            for key, val in self.session_args.iteritems():
+                setattr(self._session, key, val)
         return self._session
 
     def validate_config(self):
@@ -206,50 +203,33 @@ class BaseService(RegionConfigurableMixin):
         #
         # The pre_send hook only works on requests 0.  We replicate that for
         # requests 1 just below.
-        hooks = {'pre_send': functools.partial(_log_request_data,  self.log),
-                 'response': functools.partial(_log_response_data, self.log)}
-        if requests.__version__ >= '1.0':
-            request = requests.Request(method=method, url=url,
-                                       params=params, data=data,
-                                       headers=headers)
-            if auth is not None:
-                auth.apply_to_request(request, self)
-            # A prepared request gives us extra info we want to log
-            p_request = request.prepare()
-            p_request.hooks = {'response': hooks['response']}
-            self.log.debug('request method: %s', request.method)
-            self.log.debug('request url:    %s', p_request.url)
-            if isinstance(p_request.headers, dict):
-                for key, val in sorted(p_request.headers.iteritems()):
-                    if key.lower().endswith('password'):
-                        val = '<redacted>'
-                    self.log.debug('request header: %s: %s', key, val)
-            if isinstance(request.params, dict):
-                for key, val in sorted(request.params.iteritems()):
-                    if key.lower().endswith('password'):
-                        val = '<redacted>'
-                    self.log.debug('request param:  %s: %s', key, val)
-            if isinstance(request.data, dict):
-                for key, val in sorted(request.data.iteritems()):
-                    if key.lower().endswith('password'):
-                        val = '<redacted>'
-                    self.log.debug('request data:   %s: %s', key, val)
-            p_request.start_time = datetime.datetime.now()
-            return self.session.send(p_request, stream=True,
-                                     timeout=self.timeout)
-        else:
-            request = requests.Request(method=method, url=url, params=params,
-                                       data=data, headers=headers,
-                                       timeout=self.timeout)
-            if auth is not None:
-                auth.apply_to_request(request, self)
-            request.session = self.session
-            # A hook lets us log all the info that requests adds right
-            # before sending
-            request.hooks = hooks
-            request.start_time = datetime.datetime.now()
-            request.send()
-            return request.response
+        hooks = {'response': functools.partial(_log_response_data, self.log)}
+        request = requests.Request(method=method, url=url, params=params,
+                                   data=data, headers=headers)
+        if auth is not None:
+            auth.apply_to_request(request, self)
+        # A prepared request gives us extra info we want to log
+        p_request = request.prepare()
+        p_request.hooks = {'response': hooks['response']}
+        self.log.debug('request method: %s', request.method)
+        self.log.debug('request url:    %s', p_request.url)
+        if isinstance(p_request.headers, dict):
+            for key, val in sorted(p_request.headers.iteritems()):
+                if key.lower().endswith('password'):
+                    val = '<redacted>'
+                self.log.debug('request header: %s: %s', key, val)
+        if isinstance(request.params, dict):
+            for key, val in sorted(request.params.iteritems()):
+                if key.lower().endswith('password'):
+                    val = '<redacted>'
+                self.log.debug('request param:  %s: %s', key, val)
+        if isinstance(request.data, dict):
+            for key, val in sorted(request.data.iteritems()):
+                if key.lower().endswith('password'):
+                    val = '<redacted>'
+                self.log.debug('request data:   %s: %s', key, val)
+        p_request.start_time = datetime.datetime.now()
+        return self.session.send(p_request, stream=True, timeout=self.timeout)
 
     def __configure_endpoint(self):
         # self.args gets highest precedence
@@ -271,27 +251,6 @@ class BaseService(RegionConfigurableMixin):
                 region_name = None
         self.endpoint = url
         self.region_name = region_name
-
-
-# Note that the hook this is meant to run as was removed from requests 1.
-def _log_request_data(logger, request, **_):
-    logger.debug('request method: %s', request.method)
-    logger.debug('request url:    %s', request.full_url)
-    if isinstance(request.headers, dict):
-        for key, val in sorted(request.headers.iteritems()):
-            if key.lower().endswith('password'):
-                val = '<redacted>'
-            logger.debug('request header: %s: %s', key, val)
-    if isinstance(request.params, dict):
-        for key, val in sorted(request.params.iteritems()):
-            if key.lower().endswith('password'):
-                val = '<redacted>'
-            logger.debug('request param:  %s: %s', key, val)
-    if isinstance(request.data, dict):
-        for key, val in sorted(request.data.iteritems()):
-            if key.lower().endswith('password'):
-                val = '<redacted>'
-            logger.debug('request data:   %s: %s', key, val)
 
 
 def _log_response_data(logger, response, **_):
