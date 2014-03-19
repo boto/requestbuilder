@@ -14,6 +14,7 @@
 
 from __future__ import absolute_import
 
+import collections
 import datetime
 import functools
 import logging
@@ -214,22 +215,22 @@ class BaseService(RegionConfigurableMixin):
         p_request.hooks = {'response': hooks['response']}
         self.log.debug('request method: %s', request.method)
         self.log.debug('request url:    %s', p_request.url)
-        if isinstance(p_request.headers, dict):
+        if isinstance(p_request.headers, (dict, collections.Mapping)):
             for key, val in sorted(p_request.headers.iteritems()):
                 if key.lower().endswith('password'):
                     val = '<redacted>'
                 self.log.debug('request header: %s: %s', key, val)
-        if isinstance(request.params, dict):
+        if isinstance(request.params, (dict, collections.Mapping)):
             for key, val in sorted(request.params.iteritems()):
                 if key.lower().endswith('password'):
                     val = '<redacted>'
                 self.log.debug('request param:  %s: %s', key, val)
-        if isinstance(request.data, dict):
+        if isinstance(request.data, (dict, collections.Mapping)):
             for key, val in sorted(request.data.iteritems()):
                 if key.lower().endswith('password'):
                     val = '<redacted>'
                 self.log.debug('request data:   %s: %s', key, val)
-        if isinstance(request.files, dict):
+        if isinstance(request.files, (dict, collections.Mapping)):
             for key, val in sorted(request.files.iteritems()):
                 if hasattr(val, '__len__'):
                     val = '<{0} bytes>'.format(len(val))
