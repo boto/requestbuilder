@@ -60,17 +60,22 @@ class HmacKeyAuth(BaseAuth):
     Basis for AWS HMAC-based authentication
     '''
     ARGS = [Arg('-I', '--access-key-id', dest='key_id', metavar='KEY_ID'),
-            Arg('-S', '--secret-key', dest='secret_key', metavar='KEY')]
+            Arg('-S', '--secret-key', dest='secret_key', metavar='KEY'),
+            Arg('--security-token', dest='security_token', metavar='TOKEN')]
 
     def configure(self):
         # If the current user/region was explicitly set (e.g. with --region),
         # use that first
         self.configure_from_configfile(only_if_explicit=True)
         # Try the environment next
-        if 'AWS_ACCESS_KEY' in os.environ and not self.args.get('key_id'):
-            self.args['key_id'] = os.getenv('AWS_ACCESS_KEY')
-        if 'AWS_SECRET_KEY' in os.environ and not self.args.get('secret_key'):
-            self.args['secret_key'] = os.getenv('AWS_SECRET_KEY')
+        self.args['key_id'] = (self.args.get('key_id') or
+                               os.getenv('AWS_ACCESS_KEY_ID') or
+                               os.getenv('AWS_ACCESS_KEY'))
+        self.args['secret_key'] = (self.args.get('secret_key') or
+                                   os.getenv('AWS_SECRET_ACCESS_KEY') or
+                                   os.getenv('AWS_SECRET_KEY'))
+        self.args['security_token'] = (self.args.get('security_token') or
+                                       os.getenv('AWS_SECURITY_TOKEN'))
         # See if an AWS credential file was given in the environment
         self.configure_from_aws_credential_file()
         # Try the requestbuilder config file next
@@ -92,13 +97,12 @@ class HmacKeyAuth(BaseAuth):
                     if '=' in line:
                         (key, val) = line.split('=', 1)
                         if (key.strip() == 'AWSAccessKeyId' and
-                            not self.args.get('key_id')):
+                                not self.args.get('key_id')):
                             # There's probably a better way to do this, but it
                             # seems to work for me.  Patches are welcome.  :)
                             self.args['key_id'] = val.strip()
                         elif (key.strip() == 'AWSSecretKey' and
-                            not self.args.get('secret_key')):
-                            # This space for rent
+                              not self.args.get('secret_key')):
                             self.args['secret_key'] = val.strip()
 
     def configure_from_configfile(self, only_if_explicit=False):
@@ -134,6 +138,8 @@ class S3RestAuth(HmacKeyAuth):
             req.headers = {}
         req.headers['Date'] = email.utils.formatdate()
         req.headers['Host'] = urlparse.urlparse(req.url).netloc
+        if self.args.get('security_token'):
+            req.headers['x-amz-security-token'] = self.args['security_token']
         if 'Signature' in req.headers:
             del req.headers['Signature']
         c_headers = self.get_canonicalized_headers(req)
@@ -208,10 +214,12 @@ class QuerySigV2Auth(HmacKeyAuth):
     def apply_to_request(self, req, service):
         if req.params is None:
             req.params = {}
-        req.params['AWSAccessKeyId']   = self.args['key_id']
+        req.params['AWSAccessKeyId'] = self.args['key_id']
         req.params['SignatureVersion'] = 2
-        req.params['SignatureMethod']  = 'HmacSHA256'
-        req.params['Timestamp']        = time.strftime(ISO8601, time.gmtime())
+        req.params['SignatureMethod'] = 'HmacSHA256'
+        req.params['Timestamp'] = time.strftime(ISO8601, time.gmtime())
+        if self.args.get('security_token'):
+            req.params['SecurityToken'] = self.args['security_token']
         if 'Signature' in req.params:
             # Needed for retries so old signatures aren't included in to_sign
             del req.params['Signature']
