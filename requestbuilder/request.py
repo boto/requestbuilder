@@ -82,6 +82,7 @@ class BaseRequest(BaseCommand):
         self.headers   = {}
         self.params    = {}
         self.body      = ''
+        self.files     = {}
 
         # HTTP response obtained from the server
         self.response = None
@@ -153,7 +154,8 @@ class BaseRequest(BaseCommand):
         try:
             self.response = self.service.send_request(
                 method=self.method, path=self.path, headers=headers,
-                params=params, data=self.body, auth=self.auth)
+                params=params, data=self.body, files=self.files,
+                auth=self.auth)
             return self.parse_response(self.response)
         except ServerError as err:
             self.response = err.response

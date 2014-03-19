@@ -111,7 +111,7 @@ class BaseService(RegionConfigurableMixin):
             raise ServiceInitError(msg)
 
     def send_request(self, method='GET', path=None, params=None, headers=None,
-                     data=None, auth=None):
+                     data=None, files=None, auth=None):
         ## TODO:  test url-encoding
         if path:
             # We can't simply use urljoin because a path might start with '/'
@@ -146,8 +146,8 @@ class BaseService(RegionConfigurableMixin):
 
                     self.log.info('sending request (attempt %i of %i)',
                                   attempt_no, max_tries)
-                    response = self.__log_and_send_request(method, url, params,
-                                                           data, headers, auth)
+                    response = self.__log_and_send_request(
+                        method, url, params, data, files, headers, auth)
                     if response.status_code not in (500, 503):
                         break
                     # If it *was* in that list, retry
@@ -195,7 +195,8 @@ class BaseService(RegionConfigurableMixin):
         self.log.debug('HTTP error', exc_info=True)
         raise ServerError(response)
 
-    def __log_and_send_request(self, method, url, params, data, headers, auth):
+    def __log_and_send_request(self, method, url, params, data, files, headers,
+                               auth):
         # Requests 1 gives auth handlers PreparedRequests instead of the
         # original Requests like version 0 does.  Since most of our auth
         # handlers inspect and/or modify things that aren't headers, we
@@ -205,7 +206,7 @@ class BaseService(RegionConfigurableMixin):
         # requests 1 just below.
         hooks = {'response': functools.partial(_log_response_data, self.log)}
         request = requests.Request(method=method, url=url, params=params,
-                                   data=data, headers=headers)
+                                   data=data, files=files, headers=headers)
         if auth is not None:
             auth.apply_to_request(request, self)
         # A prepared request gives us extra info we want to log
@@ -228,6 +229,11 @@ class BaseService(RegionConfigurableMixin):
                 if key.lower().endswith('password'):
                     val = '<redacted>'
                 self.log.debug('request data:   %s: %s', key, val)
+        if isinstance(request.files, dict):
+            for key, val in sorted(request.files.iteritems()):
+                if hasattr(val, '__len__'):
+                    val = '<{0} bytes>'.format(len(val))
+                self.log.debug('request file:   %s: %s', key, val)
         p_request.start_time = datetime.datetime.now()
         return self.session.send(p_request, stream=True, timeout=self.timeout)
 
