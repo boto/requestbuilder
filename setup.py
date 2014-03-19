@@ -1,4 +1,4 @@
-# Copyright (c) 2012, Eucalyptus Systems, Inc.
+# Copyright (c) 2012-2014, Eucalyptus Systems, Inc.
 #
 # Permission to use, copy, modify, and/or distribute this software for
 # any purpose with or without fee is hereby granted, provided that the
@@ -15,9 +15,17 @@
 from distutils.command.build_py import build_py
 from distutils.command.sdist import sdist
 import os.path
+import sys
+
 from setuptools import find_packages, setup
 
 from requestbuilder import __version__
+
+
+requirements = ['requests>=1',
+                'six']
+if sys.version_info < (2, 7):
+    requirements.append('argparse')
 
 
 class build_py_with_git_version(build_py):
@@ -67,10 +75,9 @@ setup(name='requestbuilder',
       description='Command line-driven HTTP request builder',
       author='Garrett Holmstrom (gholms)',
       author_email='gholms@devzero.com',
+      url='https://github.com/boto/requestbuilder',
       packages=find_packages(),
-      install_requires=['argparse',
-                        'requests>=1',
-                        'six'],
+      install_requires=requirements,
       license='ISC',
       platforms='Posix; MacOS X',
       classifiers=['Development Status :: 3 - Alpha',

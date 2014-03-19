@@ -18,7 +18,7 @@ import os.path
 import subprocess
 
 
-__version__ = '0.2.0-dev'
+__version__ = '0.2.0-pre1'
 
 if '__file__' in globals():
     # Check if this is a git repo; maybe we can get more precise version info
@@ -30,7 +30,7 @@ if '__file__' in globals():
         git.wait()
         git.stderr.read()
         if git.returncode == 0:
-            __version__ = git.stdout.read().strip()
+            __version__ = git.stdout.read().strip().lstrip('v')
             if type(__version__).__name__ == 'bytes':
                 __version__ = __version__.decode()
     except:
