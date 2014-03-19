@@ -31,36 +31,29 @@ class ConfigView(object):
         user = user or self.user
         return ConfigView(self.__data, region=region, user=user)
 
-    def get_global_option(self, option):
-        self.log.info('finding global option %s', option)
-        value = self.__data.globals.get(option)
-        if value:
-            self.log.info('  found   %s = %s', option, value)
-        else:
-            self.log.info('  novalue for %s', option)
-        return value
+    def get_global_option(self, option, redact=False):
+        return self.__data.lookup_global(option, redact=redact)
 
     def get_region_option(self, option, region=None, redact=False):
         return self.get_region_option2(option, region=region,
                                        redact=redact)[0]
 
     def get_region_option2(self, option, region=None, redact=False):
-        self.log.info('finding region option %s', option)
         region = region or self.region
         if region:
             return self.__data.lookup(self.__data.regions, region, option,
-                                      redact=redact)
+                                      redact=redact,
+                                      confdict_log_name='region')
         return None, None
 
     def get_user_option(self, option, user=None, redact=False):
         return self.get_user_option2(option, user=user, redact=redact)[0]
 
     def get_user_option2(self, option, user=None, redact=False):
-        self.log.info('finding user option %s', option)
         user = user or self.user
         if user:
             return self.__data.lookup(self.__data.users, user, option,
-                                      redact=redact)
+                                      redact=redact, confdict_log_name='user')
         return None, None
 
     def get_all_region_options(self, option):
@@ -130,11 +123,28 @@ class ConfigData(object):
                 self.users[user] = dict(parser.items(section))
             # Ignore unrecognized sections for forward compatibility
 
-    def lookup(self, confdict, section, option, redact=False, seen=None):
+    def lookup_global(self, option, redact=False):
+        self._memo.setdefault(id(self.globals), {})
+        if option in self._memo[id(self.globals)]:
+            return self._memo[id(self.globals)][option]
+        else:
+            self.log.info('finding global option %s', option)
+            value = self.globals.get(option)
+            self._memo[id(self.globals)][option] = value
+            if value:
+                self.log.info('  found   %s = %s', option, value)
+            else:
+                self.log.info('  novalue for %s', option)
+            return value
+
+    def lookup(self, confdict, section, option, redact=False, seen=None,
+               confdict_log_name=None):
         self._memo.setdefault(id(confdict), {})
         if (section, option) in self._memo[id(confdict)]:
             return self._memo[id(confdict)][(section, option)]
         else:
+            if confdict_log_name is not None:
+                self.log.info('finding %s option %s', confdict_log_name,option)
             values = self.__lookup(confdict, section, option, redact=redact,
                                    seen=seen)
             self._memo[id(confdict)][(section, option)] = values
