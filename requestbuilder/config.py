@@ -85,11 +85,11 @@ class ConfigView(object):
 class ConfigData(object):
     def __init__(self, filenames):
         self.log = logging.getLogger('Config')
-        self.log.addHandler(logging.NullHandler())  # cheap warning silencing
+        self.log.addHandler(_NullLogHandler())  # cheap warning silencing
         self.globals = {}
         self.regions = {}
-        self.users   = {}
-        self._memo   = {}
+        self.users = {}
+        self._memo = {}
         self._parse_config(filenames)
 
     def _parse_config(self, filenames):
@@ -228,3 +228,14 @@ class ConfigData(object):
             return value, '*'
         self.log.info('  novalue for %s', option)
         return None, None
+
+
+class _NullLogHandler(logging.Handler):
+    def handle(self, record):
+        pass
+
+    def emit(self, record):
+        pass
+
+    def createLock(self):
+        self.lock = None
