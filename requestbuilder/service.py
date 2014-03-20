@@ -244,7 +244,7 @@ class BaseService(RegionConfigurableMixin):
             url, region_name = _parse_endpoint_url(self.args['url'])
         # Environment comes next
         elif os.getenv(self.URL_ENVVAR):
-            url, region_name = _parse_endpoint_url(self.args['url'])
+            url, region_name = _parse_endpoint_url(os.getenv(self.URL_ENVVAR))
         # Try the config file
         elif self.NAME:
             url, section = self.config.get_region_option2(self.NAME + '-url')
