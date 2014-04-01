@@ -269,7 +269,7 @@ def _log_response_data(logger, response, **_):
         logger.error('response status: %i', response.status_code)
     else:
         logger.info('response status: %i', response.status_code)
-    if isinstance(response.headers, dict):
+    if isinstance(response.headers, (dict, collections.Mapping)):
         for key, val in sorted(response.headers.items()):
             logger.debug('response header: %s: %s', key, val)
 
