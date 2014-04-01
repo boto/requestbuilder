@@ -196,7 +196,7 @@ class BaseCommand(object):
                 return [arg]
         elif isinstance(arglike_obj, MutuallyExclusiveArgList):
             exgroup = parser.add_mutually_exclusive_group(
-                    required=arglike_obj.required)
+                    required=arglike_obj.is_required)
             args = []
             for group_arg in arglike_obj:
                 args.extend(self.__add_arg_to_cli_parser(group_arg, exgroup))

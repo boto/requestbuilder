@@ -80,20 +80,30 @@ class Arg(object):
 class MutuallyExclusiveArgList(list):
     '''
     Pass Args as positional arguments to __init__ to create a set of
-    command line arguments that are mutually exclusive.  If the first
-    argument passed to __init__ is True then the user must specify
-    exactly one of them.
+    command line arguments that are mutually exclusive.  If you also
+    call the required() method then the user must specify exactly one
+    of them.  The recommended way to do that is via chaining it from
+    __init__.
 
-    Example:  MutuallyExclusiveArgList(Arg('--one'), Arg('--two'))
+    Examples:
+
+        MutuallyExclusiveArgList(Arg('--spam'), Arg('--eggs'))
+
+        MutuallyExclusiveArgList(Arg('--spam'),
+                                 Arg('--eggs')).required()
     '''
 
     def __init__(self, *args):
         if len(args) > 0 and isinstance(args[0], bool):
-            self.required = args[0]
+            self.is_required = args[0]
             list.__init__(self, args[1:])
         else:
-            self.required = False
+            self.is_required = False
             list.__init__(self, args)
+
+    def required(self):
+        self.is_required = True
+        return self
 
 
 class Filter(object):
