@@ -15,6 +15,8 @@
 from __future__ import absolute_import
 
 import base64
+import calendar
+import datetime
 import email.utils
 import hashlib
 import hmac
@@ -143,10 +145,10 @@ class S3RestAuth(HmacKeyAuth):
         if 'Signature' in req.headers:
             del req.headers['Signature']
         c_headers = self.get_canonicalized_headers(req)
-        self.log.debug('canonicalized_headers: %s', repr(c_headers))
+        self.log.debug('canonicalized headers: %s', repr(c_headers))
         c_resource = self.get_canonicalized_resource(req, service)
         self.log.debug('canonicalized resource: %s', repr(c_resource))
-        to_sign = '\n'.join((req.method.upper(),
+        to_sign = '\n'.join((req.method,
                              req.headers.get('Content-MD5', ''),
                              req.headers.get('Content-Type', ''),
                              req.headers.get('Date'),
@@ -156,6 +158,34 @@ class S3RestAuth(HmacKeyAuth):
         self.log.debug('b64-encoded signature: %s', signature)
         req.headers['Authorization'] = 'AWS {0}:{1}'.format(self.args['key_id'],
                                                             signature)
+
+    def apply_to_request_params(self, req, service, validity_timedelta):
+        # This does not implement security tokens.
+        for param in ('AWSAccessKeyId', 'Expires', 'Signature'):
+            req.params.pop(param, None)
+
+        future = datetime.datetime.utcnow() + validity_timedelta
+        expiration = calendar.timegm(future.utctimetuple())
+        self.log.debug('expiration: %i (%f seconds from now)',
+                       expiration, validity_timedelta.total_seconds())
+        c_headers = self.get_canonicalized_headers(req)
+        self.log.debug('canonicalized headers: %s', repr(c_headers))
+        c_resource = self.get_canonicalized_resource(req, service)
+        self.log.debug('canonicalized resource: %s', repr(c_resource))
+        to_sign = '\n'.join((req.method,
+                             req.headers.get('Content-MD5', ''),
+                             req.headers.get('Content-Type', ''),
+                             six.text_type(expiration),
+                             c_headers + c_resource))
+        self.log.debug('string to sign: %s', repr(to_sign))
+        signature = self.sign_string(to_sign.encode('utf-8'))
+        self.log.debug('b64-encoded signature: %s', signature)
+        req.params['AWSAccessKeyId'] = self.args['key_id']
+        req.params['Expires'] = six.text_type(expiration)
+        req.params['Signature'] = signature
+        if self.args.get('security_token'):
+            # This is a guess.  I have no evidence that this actually works.
+            req.params['SecurityToken'] = self.args['security_token']
 
     def get_canonicalized_resource(self, req, service):
         # /bucket/keyname

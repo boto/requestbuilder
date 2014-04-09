@@ -113,7 +113,7 @@ class BaseService(RegionConfigurableMixin):
 
     def send_request(self, method='GET', path=None, params=None, headers=None,
                      data=None, files=None, auth=None):
-        ## TODO:  test url-encoding
+        # TODO:  test url-encoding
         if path:
             # We can't simply use urljoin because a path might start with '/'
             # like it could for S3 keys that start with that character.
@@ -153,7 +153,7 @@ class BaseService(RegionConfigurableMixin):
                         break
                     # If it *was* in that list, retry
                 if (response.status_code in (301, 302, 307, 308) and
-                    redirects_left > 0 and 'Location' in response.headers):
+                        redirects_left > 0 and 'Location' in response.headers):
                     # Standard redirect -- we need to handle this ourselves
                     # because we have to re-sign requests when their URLs
                     # change.
