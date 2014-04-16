@@ -31,6 +31,7 @@ import urlparse
 from requestbuilder import Arg
 from requestbuilder.exceptions import AuthError
 
+
 ISO8601 = '%Y-%m-%dT%H:%M:%SZ'
 
 
@@ -44,8 +45,8 @@ class BaseAuth(object):
     ARGS = []
 
     def __init__(self, config, loglevel=None, **kwargs):
-        self.args    = kwargs
-        self.config  = config
+        self.args = kwargs
+        self.config = config
         self.log = logging.getLogger(self.__class__.__name__)
         if loglevel is not None:
             self.log.level = loglevel
@@ -159,15 +160,16 @@ class S3RestAuth(HmacKeyAuth):
         req.headers['Authorization'] = 'AWS {0}:{1}'.format(self.args['key_id'],
                                                             signature)
 
-    def apply_to_request_params(self, req, service, validity_timedelta):
+    def apply_to_request_params(self, req, service, expiration_datetime):
         # This does not implement security tokens.
         for param in ('AWSAccessKeyId', 'Expires', 'Signature'):
             req.params.pop(param, None)
 
-        future = datetime.datetime.utcnow() + validity_timedelta
-        expiration = calendar.timegm(future.utctimetuple())
+        expiration = calendar.timegm(expiration_datetime.utctimetuple())
+        delta_t = (expiration_datetime -
+                   datetime.datetime.utcnow()).total_seconds()
         self.log.debug('expiration: %i (%f seconds from now)',
-                       expiration, validity_timedelta.total_seconds())
+                       expiration, delta_t)
         c_headers = self.get_canonicalized_headers(req)
         self.log.debug('canonicalized headers: %s', repr(c_headers))
         c_resource = self.get_canonicalized_resource(req, service)
