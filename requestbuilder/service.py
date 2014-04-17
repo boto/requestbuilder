@@ -58,6 +58,18 @@ class BaseService(RegionConfigurableMixin):
         self.timeout = timeout
         self._session = None
 
+    @classmethod
+    def from_other(cls, other, **kwargs):
+        kwargs.setdefault('loglevel', other.log.level)
+        kwargs.setdefault('max_retries', other.max_retries)
+        kwargs.setdefault('session_args', dict(other.session_args))
+        kwargs.setdefault('timeout', other.timeout)
+        if 'region' in other.args:
+            kwargs.setdefault('region', other.args['region'])
+        new = cls(other.config, **kwargs)
+        new.configure()
+        return new
+
     def configure(self):
         # Configure user and region before grabbing endpoint info since
         # the latter may depend upon the former

@@ -66,6 +66,16 @@ class HmacKeyAuth(BaseAuth):
             Arg('-S', '--secret-key', dest='secret_key', metavar='KEY'),
             Arg('--security-token', dest='security_token', metavar='TOKEN')]
 
+    @classmethod
+    def from_other(cls, other, **kwargs):
+        kwargs.setdefault('loglevel', other.log.level)
+        kwargs.setdefault('key_id', other.args.get('key_id'))
+        kwargs.setdefault('secret_key', other.args.get('secret_key'))
+        kwargs.setdefault('security_token', other.args.get('security_token'))
+        new = cls(other.config, **kwargs)
+        new.configure()
+        return new
+
     def configure(self):
         # If the current user/region was explicitly set (e.g. with --region),
         # use that first

@@ -67,7 +67,7 @@ class BaseCommand(object):
     SUITE = RequestBuilder
     __CONFIGURED_FROM_CLI = False
 
-    def __init__(self, config=None, _do_cli=False, **kwargs):
+    def __init__(self, config=None, loglevel=None, _do_cli=False, **kwargs):
         self.args          = kwargs
         self.config        = config  # created by _process_configfiles if None
         self.log           = None  # created by _configure_logging
@@ -76,7 +76,7 @@ class BaseCommand(object):
         self._cli_parser   = None  # created by _build_parser
         self.__debug       = False
 
-        self._configure_logging()
+        self._configure_logging(loglevel)
         self._process_configfiles()
         if _do_cli:
             if BaseCommand.__CONFIGURED_FROM_CLI:
@@ -119,9 +119,18 @@ class BaseCommand(object):
             else:
                 raise
 
-    def _configure_logging(self):
+    @classmethod
+    def from_other(cls, other, **kwargs):
+        kwargs.setdefault('loglevel', other.log.level)
+        new = cls(config=self.config, **kwargs)
+        # That already calls configure
+        return new
+
+    def _configure_logging(self, loglevel):
         self.log = logging.getLogger(self.name)
-        if self.debug:
+        if loglevel is not None:
+            self.log.setLevel(loglevel)
+        elif self.debug:
             self.log.setLevel(logging.DEBUG)
 
     def _process_configfiles(self):

@@ -109,6 +109,15 @@ class BaseRequest(BaseCommand):
                     self.config, loglevel=self.log.level)
         BaseCommand._post_init(self)
 
+    @classmethod
+    def from_other(cls, other, **kwargs):
+        kwargs.setdefault('service', other.service)
+        kwargs.setdefault('auth', other.auth)
+        kwargs.setdefault('loglevel', other.log.level)
+        new = cls(config=other.config, **kwargs)
+        # That already calls configure
+        return new
+
     def collect_arg_objs(self):
         arg_objs = BaseCommand.collect_arg_objs(self)
         if self.service is not None:
