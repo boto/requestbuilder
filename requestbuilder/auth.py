@@ -119,8 +119,7 @@ class HmacKeyAuth(BaseAuth):
                             self.args['secret_key'] = val.strip()
 
     def configure_from_configfile(self, only_if_explicit=False):
-        if (only_if_explicit and self.config.user is None and
-                self.config.region is None):
+        if only_if_explicit and not self.args.get('region'):  # Somewhat hacky
             # The current user/region were not explicitly set, so do nothing.
             return
         if not self.args.get('key_id'):
