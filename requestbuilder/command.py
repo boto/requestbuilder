@@ -124,7 +124,7 @@ class BaseCommand(object):
     @classmethod
     def from_other(cls, other, **kwargs):
         kwargs.setdefault('loglevel', other.log.level)
-        new = cls(config=self.config, **kwargs)
+        new = cls(config=other.config, **kwargs)
         # That already calls configure
         return new
 

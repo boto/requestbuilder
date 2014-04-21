@@ -41,7 +41,7 @@ class RegionConfigurableMixin(object):
 
     def update_config_view(self, region=None, user=None):
         # Different sources of user/region info can override only parts of
-        # the set, so we only overwire things conditionally.
+        # the set, so we only overwite things conditionally.
 
         # self.args gets highest precedence
         if self.args.get('region'):
