@@ -18,6 +18,7 @@ import argparse
 import bdb
 import logging
 import os.path
+import signal
 import sys
 import textwrap
 import traceback
@@ -32,6 +33,7 @@ from requestbuilder.exceptions import ArgumentError
 from requestbuilder.logging import configure_root_logger
 from requestbuilder.suite import RequestBuilder
 from requestbuilder.util import add_default_routes, aggregate_subclass_fields
+
 
 class BaseCommand(object):
     '''
@@ -226,6 +228,7 @@ class BaseCommand(object):
         if cli_args.pop('_debugger', False):
             self.__debug = True
             sys.excepthook = _debugger_except_hook
+            signal.signal(signal.SIGUSR1, _debugger_usr1_handler)
         # Everything goes in self.args.  distribute_args() also puts them
         # elsewhere later on in the process.
         self.args.update(cli_args)
@@ -374,3 +377,14 @@ def _debugger_except_hook(type_, value, tracebk):
     else:
         traceback.print_tb(tracebk)
         sys.exit(1)
+
+
+def _debugger_usr1_handler(_, frame):
+    """
+    Show a traceback and local variables when sent SIGUSR1.  Note that
+    this could cause exceptions due to interrupted system calls.
+    """
+    frame_dict = {'_frame': frame}
+    frame_dict.update(frame.f_globals)
+    frame_dict.update(frame.f_locals)
+    print >> sys.stderr, ''.join(traceback.format_stack(frame))
