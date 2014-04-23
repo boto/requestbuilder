@@ -175,10 +175,12 @@ class S3RestAuth(HmacKeyAuth):
             req.params.pop(param, None)
 
         expiration = calendar.timegm(expiration_datetime.utctimetuple())
-        delta_t = (expiration_datetime -
-                   datetime.datetime.utcnow()).total_seconds()
+        delta_t = expiration_datetime - datetime.datetime.utcnow()
+        delta_t_sec = ((delta_t.microseconds +
+                        (delta_t.seconds + delta_t.days * 24 * 3600) * 10**6)
+                       / 10**6)
         self.log.debug('expiration: %i (%f seconds from now)',
-                       expiration, delta_t)
+                       expiration, delta_t_sec)
         c_headers = self.get_canonicalized_headers(req)
         self.log.debug('canonicalized headers: %s', repr(c_headers))
         c_resource = self.get_canonicalized_resource(req, service)
