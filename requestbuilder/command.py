@@ -142,7 +142,7 @@ class BaseCommand(object):
             self.config = ConfigView(config_data)
         # Now that we have a config file we should check to see if it wants
         # us to turn on debugging
-        if self.__config_enables_debugging():
+        if self.debug:
             self.log.setLevel(logging.DEBUG)
             self.config.log.setLevel(logging.DEBUG)
 
