@@ -285,17 +285,17 @@ class AWSQueryRequest(BaseRequest):
 
     def flatten_params(self, args, prefix=None):
         '''
-        Given a possibly-nested dict of args and an arg routing destination,
-        transform each element in the dict that matches the corresponding
-        arg routing table into a simple dict containing key-value pairs
-        suitable for use as query parameters.  This implementation flattens
-        dicts and lists into the format given by AWS query APIs, which use
-        dotted lists of dict keys and list indices to indicate nested
-        structures.
+        Given a possibly-nested dict of args and an arg routing
+        destination, transform each element in the dict that matches the
+        corresponding arg routing table into a simple dict containing
+        key-value pairs suitable for use as query parameters.  This
+        implementation flattens dicts and lists into the format given
+        by AWS query APIs, which use dotted lists of dict keys and list
+        indices to indicate nested structures.
 
-        Keys with nonzero values that evaluate as false are ignored.  If a
-        collection of keys is supplied with ignore then keys that do not
-        appear in that collection are also ignored.
+        Keys with non-boolean, non-zero values that evaluate as false
+        are ignored.  To include an empty string as a parameter, pass
+        EMPTY (the object, not the string) as its value.
 
         Examples:
           in:  {'InstanceId': 'i-12345678', 'PublicIp': '1.2.3.4'}
@@ -319,12 +319,12 @@ class AWSQueryRequest(BaseRequest):
         '''
         flattened = {}
         if args is None:
-            return {}
+            pass
         elif isinstance(args, dict):
             for (key, val) in args.iteritems():
                 # Prefix.Key1, Prefix.Key2, ...
                 if prefix:
-                    prefixed_key = prefix + '.' + str(key)
+                    prefixed_key = '{0}.{1}'.format(prefix, key)
                 else:
                     prefixed_key = str(key)
 
@@ -334,13 +334,15 @@ class AWSQueryRequest(BaseRequest):
                     flattened[prefixed_key] = val.read()
                 elif val or val is 0:
                     flattened[prefixed_key] = str(val)
+                elif isinstance(val, bool):
+                    flattened[prefixed_key] = str(val).lower()
                 elif val is EMPTY:
                     flattened[prefixed_key] = ''
         elif isinstance(args, list):
             for (i_item, item) in enumerate(args, 1):
                 # Prefix.1, Prefix.2, ...
                 if prefix:
-                    prefixed_key = prefix + '.' + str(i_item)
+                    prefixed_key = '{0}.{1}'.format(prefix, i_item)
                 else:
                     prefixed_key = str(i_item)
 
@@ -350,6 +352,8 @@ class AWSQueryRequest(BaseRequest):
                     flattened[prefixed_key] = item.read()
                 elif item or item == 0:
                     flattened[prefixed_key] = str(item)
+                elif isinstance(item, bool):
+                    flattened[prefixed_key] = str(item).lower()
                 elif item is EMPTY:
                     flattened[prefixed_key] = ''
         else:
