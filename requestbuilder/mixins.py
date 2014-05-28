@@ -84,7 +84,7 @@ class RegionConfigurableMixin(object):
         if not regionish:
             return None, None
         if regionish.endswith('@'):
-            return regionish, None
+            return regionish.rstrip('@'), None
         elif '@' in regionish:
             return regionish.split('@', 1)
         else:
