@@ -293,6 +293,8 @@ class AWSQueryRequest(BaseRequest):
 
                     if isinstance(val, dict) or isinstance(val, list):
                         flattened.update(self.flatten_params(val, prefixed_key))
+                    elif isinstance(val, bool):
+                        flattened[prefixed_key] = str(val).lower()
                     elif isinstance(val, file):
                         flattened[prefixed_key] = val.read()
                     elif val or val is 0:
@@ -309,6 +311,8 @@ class AWSQueryRequest(BaseRequest):
 
                 if isinstance(item, dict) or isinstance(item, list):
                     flattened.update(self.flatten_params(item, prefixed_key))
+                elif isinstance(item, bool):
+                    flattened[prefixed_key] = str(item).lower()
                 elif isinstance(item, file):
                     flattened[prefixed_key] = item.read()
                 elif item or item == 0:
