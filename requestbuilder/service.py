@@ -20,11 +20,13 @@ import functools
 import logging
 import os.path
 import random
+import socket
 import time
 import urlparse
 import weakref
 
 import requests.exceptions
+import six
 
 from requestbuilder import SERVICE
 from requestbuilder.exceptions import (ClientError, ServerError,
@@ -116,6 +118,9 @@ class BaseService(object):
         # SSL cert verification is opt-in
         self.session_args['verify'] = self.config.get_region_option_bool(
             'verify-ssl', default=False)
+
+        # requests only applies proxy config in code paths we don't use
+        self.session_args['proxies'] = _get_proxies()
 
         # Ensure everything is okay and finish up
         self.validate_config()
@@ -344,3 +349,14 @@ def _generate_delays(max_tries):
         for retry_no in range(1, max_tries):
             next_delay = (random.random() + 1) * 2 ** (retry_no - 1)
             yield min((next_delay, 15))
+
+
+def _get_proxies():
+    try:
+        bypass = six.moves.urllib.request.proxy_bypass()
+    except (TypeError, socket.gaierror):
+        # This blows up on my old OS X machine
+        bypass = False
+    if bypass:
+        return {}
+    return six.moves.urllib.request.getproxies()
