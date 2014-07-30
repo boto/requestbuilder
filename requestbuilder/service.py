@@ -24,6 +24,7 @@ import time
 import urlparse
 
 import requests.exceptions
+import six
 
 from requestbuilder.exceptions import (ClientError, ServerError,
                                        ServiceInitError)
@@ -93,6 +94,9 @@ class BaseService(RegionConfigurableMixin):
         # SSL cert verification is opt-in
         self.session_args['verify'] = self.config.convert_to_bool(
             self.config.get_region_option('verify-ssl'), default=False)
+
+        # requests only applies proxy config in code paths we don't use
+        self.session_args['proxies'] = _get_proxies()
 
         # Ensure everything is okay and finish up
         self.validate_config()
@@ -307,3 +311,14 @@ def _parse_endpoint_url(urlish):
         region = None
         url = urlish
     return url, region
+
+
+def _get_proxies():
+    try:
+        bypass = six.moves.urllib.request.proxy_bypass()
+    except (TypeError, socket.gaierror):
+        # This blows up on my old OS X machine
+        bypass = False
+    if bypass:
+        return {}
+    return six.moves.urllib.request.getproxies()
