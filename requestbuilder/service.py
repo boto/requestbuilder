@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2013, Eucalyptus Systems, Inc.
+# Copyright (c) 2012-2014, Eucalyptus Systems, Inc.
 #
 # Permission to use, copy, modify, and/or distribute this software for
 # any purpose with or without fee is hereby granted, provided that the
@@ -20,16 +20,17 @@ import functools
 import logging
 import os.path
 import random
+import time
+import urlparse
+import weakref
+
+import requests.exceptions
+
 from requestbuilder import SERVICE
 from requestbuilder.exceptions import (ClientError, ServerError,
     ServiceInitError)
 from requestbuilder.util import (add_default_routes, aggregate_subclass_fields,
     set_userregion)
-import requests.exceptions
-import time
-import urlparse
-import weakref
-
 
 
 class BaseService(object):
