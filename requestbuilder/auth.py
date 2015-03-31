@@ -57,6 +57,11 @@ class BaseAuth(object):
     def apply_to_request(self, request, service):
         pass
 
+    def bind_to_service(self, service):
+        def wrapped_apply_to_request(req):
+            return self.apply_to_request(req, service) or req
+        return wrapped_apply_to_request
+
 
 class HmacKeyAuth(BaseAuth):
     '''
@@ -168,6 +173,7 @@ class S3RestAuth(HmacKeyAuth):
         self.log.debug('b64-encoded signature: %s', signature)
         req.headers['Authorization'] = 'AWS {0}:{1}'.format(
             self.args['key_id'], signature)
+        return req
 
     def apply_to_request_params(self, req, service, expiration_datetime):
         # This does not implement security tokens.
@@ -213,9 +219,17 @@ class S3RestAuth(HmacKeyAuth):
             resource = '/' + resource
 
         # Now append sub-resources, a.k.a. query string parameters
-        if req.params:
+        if getattr(req, 'params', None):
+            # A regular Request
+            params = req.params
+        else:
+            # A PreparedRequest
+            parsed = urlparse.urlparse(req.url)
+            params = urlparse.parse_qs(parsed.query, keep_blank_values=True)
+            params = dict((key, vals[0]) for key, vals in params.iteritems())
+        if params:
             subresources = []
-            for key, val in sorted(req.params.iteritems()):
+            for key, val in sorted(params.iteritems()):
                 if key in self.HASHED_PARAMS:
                     if val is None:
                         subresources.append(key)
@@ -254,24 +268,27 @@ class QuerySigV2Auth(HmacKeyAuth):
     '''
 
     def apply_to_request(self, req, service):
-        if req.params is None:
-            req.params = {}
-        req.params['AWSAccessKeyId'] = self.args['key_id']
-        req.params['SignatureVersion'] = 2
-        req.params['SignatureMethod'] = 'HmacSHA256'
-        req.params['Timestamp'] = time.strftime(ISO8601, time.gmtime())
-        if self.args.get('security_token'):
-            req.params['SecurityToken'] = self.args['security_token']
-        if 'Signature' in req.params:
-            # Needed for retries so old signatures aren't included in to_sign
-            del req.params['Signature']
         parsed = urlparse.urlparse(req.url)
+        if req.method == 'POST':
+            # This is probably going to break when given multipart data.
+            params = urlparse.parse_qs(req.body or '', keep_blank_values=True)
+        else:
+            params = urlparse.parse_qs(parsed.query, keep_blank_values=True)
+        params = dict((key, vals[0]) for key, vals in params.iteritems())
+        params['AWSAccessKeyId'] = self.args['key_id']
+        params['SignatureVersion'] = 2
+        params['SignatureMethod'] = 'HmacSHA256'
+        params['Timestamp'] = time.strftime(ISO8601, time.gmtime())
+        if self.args.get('security_token'):
+            params['SecurityToken'] = self.args['security_token']
+        # Needed for retries so old signatures aren't included in to_sign
+        params.pop('Signature', None)
         to_sign = '{method}\n{host}\n{path}\n'.format(
             method=req.method, host=parsed.netloc.lower(),
             path=(parsed.path or '/'))
         quoted_params = []
-        for key in sorted(req.params):
-            val = six.text_type(req.params[key])
+        for key in sorted(params):
+            val = six.text_type(params[key])
             quoted_params.append(urlparse.quote(key, safe='') + '=' +
                                  urlparse.quote(val, safe='-_~'))
         query_string = '&'.join(quoted_params)
@@ -282,18 +299,14 @@ class QuerySigV2Auth(HmacKeyAuth):
         self.log.debug('string to sign: %s', repr(redacted_to_sign))
         signature = self.sign_string(to_sign)
         self.log.debug('b64-encoded signature: %s', signature)
-        req.params['Signature'] = signature
-
-        self.convert_params_to_data(req)
+        params['Signature'] = signature
+        if req.method == 'POST':
+            req.prepare_body(params, {})
+        else:
+            req.prepare_url(urlparse.urlunparse((
+                parsed[0], parsed[1], parsed[2], '', '', '')), params)
 
         return req
-
-    def convert_params_to_data(self, req):
-        if req.method.upper() == 'POST' and isinstance(req.params, dict):
-            # POST with params -> use params as form data instead
-            self.log.debug('converting params to POST data')
-            req.data = req.params
-            req.params = None
 
     def sign_string(self, to_sign):
         req_hmac = hmac.new(self.args['secret_key'], digestmod=hashlib.sha256)

@@ -158,11 +158,10 @@ class BaseRequest(BaseCommand):
             self.log.warn('send() called before configure(); bugs may result')
         headers = dict(self.headers or {})
         headers.setdefault('User-Agent', self.suite.get_user_agent())
-        params = self.prepare_params()
         try:
             self.response = self.service.send_request(
                 method=self.method, path=self.path, headers=headers,
-                params=params, data=self.body, files=self.files,
+                params=self.params, data=self.body, files=self.files,
                 auth=self.auth)
             return self.parse_response(self.response)
         except ServerError as err:
@@ -184,9 +183,6 @@ class BaseRequest(BaseCommand):
         self.log.debug('-- end of response content --')
         self.log.info('result: failure')
         raise
-
-    def prepare_params(self):
-        return self.params or {}
 
     def parse_response(self, response):
         return response
@@ -260,19 +256,24 @@ class AWSQueryRequest(BaseRequest):
     def action(self):
         return self.name
 
-    def prepare_params(self):
-        params = self.flatten_params(self.params)
-        params['Action'] = self.action
-        params['Version'] = self.API_VERSION or self.service.API_VERSION
-        redacted_params = dict(params)
-        for key in params:
+    def send(self):
+        self.params = self.flatten_params(self.params)
+        self.params['Action'] = self.action
+        self.params['Version'] = self.API_VERSION or self.service.API_VERSION
+        redacted_params = dict(self.params)
+        for key in self.params:
             if key.lower().endswith('password'):
                 # This makes it slightly more obvious that this is redacted by
                 # the framework and not just a string.
                 redacted_params[key] = type(
                     'REDACTED', (), {'__repr__': lambda self: '<redacted>'})()
         self.log.info('parameters: %s', redacted_params)
-        return params
+
+        if self.method.upper() == 'POST':
+            self.log.debug('converting params to POST data')
+            self.body = self.params
+            self.params = None
+        return BaseRequest.send(self)
 
     def parse_response(self, response):
         # Parser for list-delimited responses like EC2's

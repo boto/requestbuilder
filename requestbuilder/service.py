@@ -215,19 +215,10 @@ class BaseService(RegionConfigurableMixin):
 
     def __log_and_send_request(self, method, url, params, data, files, headers,
                                auth):
-        # Requests 1 gives auth handlers PreparedRequests instead of the
-        # original Requests like version 0 does.  Since most of our auth
-        # handlers inspect and/or modify things that aren't headers, we
-        # manually apply auth to it in this method to make things less painful.
-        #
-        # The pre_send hook only works on requests 0.  We replicate that for
-        # requests 1 just below.
         hooks = {'response': functools.partial(_log_response_data, self.log)}
         request = requests.Request(method=method, url=url, params=params,
-                                   data=data, files=files, headers=headers)
-        if auth is not None:
-            auth.apply_to_request(request, self)
-        # A prepared request gives us extra info we want to log
+                                   data=data, files=files, headers=headers,
+                                   auth=auth.bind_to_service(self))
         p_request = request.prepare()
         p_request.hooks = {'response': hooks['response']}
         self.log.debug('request method: %s', request.method)
