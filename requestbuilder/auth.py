@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2014, Eucalyptus Systems, Inc.
+# Copyright (c) 2012-2015, Eucalyptus Systems, Inc.
 #
 # Permission to use, copy, modify, and/or distribute this software for
 # any purpose with or without fee is hereby granted, provided that the
@@ -23,10 +23,12 @@ import hmac
 import os
 import logging
 import re
-import six
+import tempfile
 import time
-import urllib
-import urlparse
+
+import six
+import six.moves.urllib as urllib
+import six.moves.urllib_parse as urlparse
 
 from requestbuilder import Arg
 from requestbuilder.exceptions import AuthError
@@ -140,10 +142,10 @@ class S3RestAuth(HmacKeyAuth):
     '''
 
     # This list comes from the CanonicalizedResource section of the above page
-    HASHED_PARAMS = set(('acl', 'lifecycle', 'location', 'logging',
-            'notification', 'partNumber', 'policy', 'requestPayment',
-            'torrent', 'uploadId', 'uploads', 'versionId', 'versioning',
-            'versions', 'website'))
+    HASHED_PARAMS = set((
+        'acl', 'lifecycle', 'location', 'logging', 'notification',
+        'partNumber', 'policy', 'requestPayment', 'torrent', 'uploadId',
+        'uploads', 'versionId', 'versioning', 'versions', 'website'))
 
     def apply_to_request(self, req, service):
         if req.headers is None:
@@ -251,7 +253,7 @@ class S3RestAuth(HmacKeyAuth):
 class QuerySigV2Auth(HmacKeyAuth):
     '''
     AWS signature version 2
-    http://docs.amazonwebservices.com/general/latest/gr/signature-version-2.html
+    http://docs.aws.amazon.com/general/latest/gr/signature-version-2.html
     '''
 
     def apply_to_request(self, req, service):
@@ -267,13 +269,14 @@ class QuerySigV2Auth(HmacKeyAuth):
             # Needed for retries so old signatures aren't included in to_sign
             del req.params['Signature']
         parsed = urlparse.urlparse(req.url)
-        to_sign = '{method}\n{host}\n{path}\n'.format(method=req.method,
-                host=parsed.netloc.lower(), path=(parsed.path or '/'))
+        to_sign = '{method}\n{host}\n{path}\n'.format(
+            method=req.method, host=parsed.netloc.lower(),
+            path=(parsed.path or '/'))
         quoted_params = []
         for key in sorted(req.params):
             val = six.text_type(req.params[key])
-            quoted_params.append(urllib.quote(key, safe='') + '=' +
-                                 urllib.quote(val, safe='-_~'))
+            quoted_params.append(urlparse.quote(key, safe='') + '=' +
+                                 urlparse.quote(val, safe='-_~'))
         query_string = '&'.join(quoted_params)
         to_sign += query_string
         # Redact passwords
@@ -292,7 +295,7 @@ class QuerySigV2Auth(HmacKeyAuth):
         if req.method.upper() == 'POST' and isinstance(req.params, dict):
             # POST with params -> use params as form data instead
             self.log.debug('converting params to POST data')
-            req.data   = req.params
+            req.data = req.params
             req.params = None
 
     def sign_string(self, to_sign):

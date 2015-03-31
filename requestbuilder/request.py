@@ -159,7 +159,7 @@ class BaseRequest(BaseCommand):
             self.log.warn('send() called before configure(); bugs may result')
         headers = dict(self.headers or {})
         headers.setdefault('User-Agent', self.suite.get_user_agent())
-        params  = self.prepare_params()
+        params = self.prepare_params()
         try:
             self.response = self.service.send_request(
                 method=self.method, path=self.path, headers=headers,
