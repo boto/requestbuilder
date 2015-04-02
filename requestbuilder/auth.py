@@ -33,6 +33,7 @@ from requestbuilder.exceptions import AuthError
 
 
 ISO8601 = '%Y-%m-%dT%H:%M:%SZ'
+ISO8601_BASIC = '%Y%m%dT%H%M%SZ'
 
 
 class BaseAuth(object):
@@ -312,3 +313,172 @@ class QuerySigV2Auth(HmacKeyAuth):
         req_hmac = hmac.new(self.args['secret_key'], digestmod=hashlib.sha256)
         req_hmac.update(to_sign)
         return base64.b64encode(req_hmac.digest())
+
+
+class HmacV4Auth(HmacKeyAuth):
+    """
+    AWS signature version 4
+    http://docs.aws.amazon.com/general/latest/gr/signature-version-4.html
+    """
+
+    def apply_to_request(self, req, service):
+        if not service.region_name:
+            self.log.error('a region name is required to use sigv4')
+            raise AuthError('region name is required; use a config file '
+                            'or prepend the region name and :: to the URL')
+        if not service.NAME:
+            self.log.critical('service class %s must have a NAME attribute '
+                              'to use sigv4', service.__class__.__name__)
+            raise AuthError('BUG: service class {0} does not have a name'
+                            .format(service.__class__.__name__))
+        payload_hash = self._hash_payload(req)  # large files will be slow here
+        now = time.time()
+        date_header = time.strftime(ISO8601_BASIC, time.gmtime(now))
+        scope = self._build_scope(service, now)
+        credential = '/'.join((self.args['key_id'],) + scope)
+        self._update_request_before_signing(req, credential, payload_hash,
+                                            date_header)
+
+        c_uri = self._get_canonical_uri(req)
+        c_query = self._get_canonical_query(req)
+        c_headers = self._get_canonical_headers(req)
+        s_headers = self._get_signed_headers(req)
+        c_request = '\n'.join((req.method.upper(), c_uri, c_query, c_headers,
+                               '', s_headers, payload_hash))
+        self.log.debug('canonical request: %s', repr(c_request))
+
+        to_sign = '\n'.join(('AWS4-HMAC-SHA256', date_header, '/'.join(scope),
+                             hashlib.sha256(c_request).hexdigest()))
+        # Redact passwords
+        redacted_to_sign = re.sub('assword=[^&]*', 'assword=<redacted>',
+                                  to_sign)
+        self.log.debug('string to sign: %s', repr(redacted_to_sign))
+
+        derived_hmac = hmac.new('AWS4{0}'.format(self.args['secret_key']),
+                                digestmod=hashlib.sha256)
+        for chunk in scope:
+            derived_hmac.update(chunk)
+            derived_hmac = hmac.new(derived_hmac.digest(),
+                                    digestmod=hashlib.sha256)
+        derived_hmac.update(to_sign)
+        signature = derived_hmac.hexdigest()
+        self.log.debug('signature: %s', signature)
+        self._apply_signature(req, credential, signature)
+        return req
+
+    def _update_request_before_signing(self, req, credential, payload_sha256,
+                                       date_header):
+        parsed = urlparse.urlparse(req.url)
+        req.headers['Host'] = parsed.netloc
+        req.headers.pop('Authorization', None)
+        req.headers['X-Amz-Content-SHA256'] = payload_sha256
+        req.headers['X-Amz-Date'] = date_header
+
+    def _apply_signature(self, req, credential, signature):
+        auth_header = ', '.join((
+            'AWS4-HMAC-SHA256 Credential={0}'.format(credential),
+            'SignedHeaders={0}'.format(self._get_signed_headers(req)),
+            'Signature={0}'.format(signature)))
+        req.headers['Authorization'] = auth_header
+
+    def _build_scope(self, service, timestamp):
+        scope = (time.strftime('%Y%m%d', time.gmtime(timestamp)),
+                 service.region_name, service.NAME, 'aws4_request')
+        self.log.debug('scope: %s', '/'.join(scope))
+        return scope
+
+    def _get_canonical_uri(self, req):
+        path = urlparse.urlsplit(req.url).path or '/'
+        # TODO:  Normalize stuff like ".."
+        c_uri = urlparse.quote(path, safe='/~')
+        self.log.debug('canonical URI: %s', c_uri)
+        return c_uri
+
+    def _get_canonical_query(self, req):
+        req_params = urlparse.parse_qsl(urlparse.urlparse(req.url).query,
+                                        keep_blank_values=True)
+        params = []
+        for key, val in sorted(req_params or []):
+            params.append('='.join((urlparse.quote(key, safe='~-_.'),
+                                    urlparse.quote(val, safe='~-_.'))))
+        c_params = '&'.join(params)
+        self.log.debug('canonical query: %s', c_params)
+        return c_params
+
+    def _get_normalized_headers(self, req):
+        # This doesn't currently support multi-value headers.
+        headers = {}
+        for key, val in req.headers.iteritems():
+            headers[key.lower().strip()] = val.strip()
+        return headers
+
+    def _get_canonical_headers(self, req):
+        headers = []
+        normalized_headers = self._get_normalized_headers(req)
+        for key, val in sorted(normalized_headers.items()):
+            headers.append(':'.join((key, val)))
+        self.log.debug('canonical headers: %s', str(headers))
+        return '\n'.join(headers)
+
+    def _get_signed_headers(self, req):
+        normalized_headers = self._get_normalized_headers(req)
+        s_headers = ';'.join(sorted(normalized_headers))
+        self.log.debug('signed headers: %s', s_headers)
+        return s_headers
+
+    def _hash_payload(self, req):
+        if self.args.get('payload_hash'):
+            return self.args['payload_hash']
+        digest = hashlib.sha256()
+        if not req.body:
+            pass
+        elif hasattr(req.body, 'seek'):
+            body_position = req.data.tell()
+            self.log.debug('payload hashing starting')
+            while True:
+                chunk = req.body.read(16384)
+                if not chunk:
+                    break
+                digest.update(chunk)
+            req.body.seek(body_position)
+            self.log.debug('payload hashing done')
+        elif hasattr(req.body, 'read'):
+            self.log.debug('payload spooling/hashing starting')
+            # 10M happens to be the size of a bundle part, the thing we upload
+            # most frequently.
+            spool = tempfile.SpooledTemporaryFile(max_size=(10 * 1024 * 1024))
+            while True:
+                chunk = req.body.read(16384)
+                if not chunk:
+                    break
+                digest.update(chunk)
+                spool.write(chunk)
+            self.log.debug('payload spooling/hashing done')
+            spool.seek(0)
+            self.log.info('re-pointing request body at spooled payload')
+            req.body = spool
+            # Should we close the original req.body here?
+        else:
+            digest.update(req.body)
+        self.log.debug('payload hash: %s', digest.hexdigest())
+        return digest.hexdigest()
+
+
+class QueryHmacV4Auth(HmacV4Auth):
+    def _update_request_before_signing(self, req, credential, payload_sha256,
+                                       date_header):
+        # We don't do anything with payload_sha256.  Is that bad?
+        parsed = urlparse.urlparse(req.url)
+        req.headers['Host'] = parsed.netloc
+        req.headers.pop('Authorization', None)
+        params = {
+            'X-Amz-Algorithm': 'AWS4-HMAC-SHA256',
+            'X-Amz-Credential': credential,
+            'X-Amz-Date': date_header,
+            'X-Amz-SignedHeaders': self._get_signed_headers(req)}
+        if self.args.get('timeout'):
+            params['X-Amz-Expires'] = self.args['timeout']
+        req.prepare_url(req.url, params)
+
+    def _apply_signature(self, req, credential, signature):
+        req.prepare_url(req.url, {'X-Amz-Signature': signature})
