@@ -127,19 +127,21 @@ class BaseService(RegionConfigurableMixin):
                 msg = 'No endpoint to connect to was given'
             raise ServiceInitError(msg)
 
+    def get_request_url(self, method='GET', path=None, params=None,
+                        headers=None, data=None, files=None, auth=None):
+        url = self.__get_url_for_path(path)
+
+        headers = dict(headers or {})
+        if 'host' not in [header.lower() for header in headers]:
+            headers['Host'] = urlparse.urlparse(self.endpoint).netloc
+
+        p_request = self.__log_and_prepare_request(method, url, params, data,
+                                                   files, headers, auth)
+        return p_request.url
+
     def send_request(self, method='GET', path=None, params=None, headers=None,
                      data=None, files=None, auth=None):
-        # TODO:  test url-encoding
-        if path:
-            # We can't simply use urljoin because a path might start with '/'
-            # like it could for S3 keys that start with that character.
-            if self.endpoint.endswith('/'):
-                url = self.endpoint + path
-            else:
-                url = self.endpoint + '/' + path
-        else:
-            url = self.endpoint
-
+        url = self.__get_url_for_path(path)
         headers = dict(headers)
         if 'host' not in [header.lower() for header in headers]:
             headers['Host'] = urlparse.urlparse(self.endpoint).netloc
@@ -163,8 +165,11 @@ class BaseService(RegionConfigurableMixin):
 
                     self.log.info('sending request (attempt %i of %i)',
                                   attempt_no, max_tries)
-                    response = self.__log_and_send_request(
+                    p_request = self.__log_and_prepare_request(
                         method, url, params, data, files, headers, auth)
+                    p_request.start_time = datetime.datetime.now()
+                    response = self.session.send(p_request, stream=True,
+                                                 timeout=self.timeout)
                     if response.status_code not in (500, 503):
                         break
                     # If it *was* in that list, retry
@@ -213,8 +218,19 @@ class BaseService(RegionConfigurableMixin):
         self.log.debug('HTTP error', exc_info=True)
         raise ServerError(response)
 
-    def __log_and_send_request(self, method, url, params, data, files, headers,
-                               auth):
+    def __get_url_for_path(self, path):
+        if path:
+            # We can't simply use urljoin because a path might start with '/'
+            # like it could for S3 keys that start with that character.
+            if self.endpoint.endswith('/'):
+                return self.endpoint + path
+            else:
+                return self.endpoint + '/' + path
+        else:
+            return self.endpoint
+
+    def __log_and_prepare_request(self, method, url, params, data, files,
+                                  headers, auth):
         hooks = {'response': functools.partial(_log_response_data, self.log)}
         request = requests.Request(method=method, url=url, params=params,
                                    data=data, files=files, headers=headers,
@@ -243,8 +259,7 @@ class BaseService(RegionConfigurableMixin):
                 if hasattr(val, '__len__'):
                     val = '<{0} bytes>'.format(len(val))
                 self.log.debug('request file:   %s: %s', key, val)
-        p_request.start_time = datetime.datetime.now()
-        return self.session.send(p_request, stream=True, timeout=self.timeout)
+        return p_request
 
     def __configure_endpoint(self):
         # self.args gets highest precedence
