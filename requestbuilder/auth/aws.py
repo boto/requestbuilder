@@ -21,7 +21,6 @@ import email.utils
 import hashlib
 import hmac
 import os
-import logging
 import re
 import time
 import warnings
@@ -30,39 +29,12 @@ import six
 import six.moves.urllib_parse as urlparse
 
 from requestbuilder import Arg
+from requestbuilder.auth import BaseAuth
 from requestbuilder.exceptions import AuthError
 
 
 ISO8601 = '%Y-%m-%dT%H:%M:%SZ'
 ISO8601_BASIC = '%Y%m%dT%H%M%SZ'
-
-
-class BaseAuth(object):
-    '''
-    Basis for all authentication
-
-    This class does nothing on its own.  It is up to you to implement the
-    necessary functions to effect an authentication scheme.
-    '''
-    ARGS = []
-
-    def __init__(self, config, loglevel=None, **kwargs):
-        self.args = kwargs
-        self.config = config
-        self.log = logging.getLogger(self.__class__.__name__)
-        if loglevel is not None:
-            self.log.level = loglevel
-
-    def configure(self):
-        pass
-
-    def apply_to_request(self, request, service):
-        pass
-
-    def bind_to_service(self, service):
-        def wrapped_apply_to_request(req):
-            return self.apply_to_request(req, service) or req
-        return wrapped_apply_to_request
 
 
 class HmacKeyAuth(BaseAuth):
@@ -140,7 +112,7 @@ class HmacKeyAuth(BaseAuth):
                 self.args['secret_key'] = config_secret_key
 
 
-class S3RestAuth(HmacKeyAuth):
+class HmacV1Auth(HmacKeyAuth):
     '''
     S3 REST authentication
     http://docs.aws.amazon.com/AmazonS3/latest/dev/RESTAuthentication.html
@@ -274,7 +246,7 @@ class S3RestAuth(HmacKeyAuth):
         return base64.b64encode(req_hmac.digest())
 
 
-class S3QueryAuth(S3RestAuth):
+class QueryHmacV1Auth(HmacV1Auth):
     DEFAULT_TIMEOUT = 600  # 10 minutes
 
     def _update_request_before_signing(self, req):
@@ -298,7 +270,7 @@ class S3QueryAuth(S3RestAuth):
         req.prepare_url(req.url, {'Signature': signature})
 
 
-class QuerySigV2Auth(HmacKeyAuth):
+class QueryHmacV2Auth(HmacKeyAuth):
     '''
     AWS signature version 2
     http://docs.aws.amazon.com/general/latest/gr/signature-version-2.html
