@@ -22,10 +22,10 @@ import os.path
 import random
 import socket
 import time
-import urlparse
 
 import requests.exceptions
 import six
+import six.moves.urllib_parse as urlparse
 
 from requestbuilder.exceptions import (ClientError, ServerError,
                                        ServiceInitError)
@@ -245,12 +245,13 @@ class BaseService(RegionConfigurableMixin):
                     val = '<redacted>'
                 self.log.debug('request header: %s: %s', key, val)
         if isinstance(request.params, (dict, collections.Mapping)):
-            for key, val in sorted(request.params.iteritems()):
+            for key, val in sorted(urlparse.parse_qsl(
+                    urlparse.urlparse(p_request.url).query)):
                 if key.lower().endswith('password'):
                     val = '<redacted>'
                 self.log.debug('request param:  %s: %s', key, val)
         if isinstance(request.data, (dict, collections.Mapping)):
-            for key, val in sorted(request.data.iteritems()):
+            for key, val in sorted(urlparse.parse_qsl(p_request.body)):
                 if key.lower().endswith('password'):
                     val = '<redacted>'
                 self.log.debug('request data:   %s: %s', key, val)
