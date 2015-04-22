@@ -15,6 +15,7 @@
 from __future__ import absolute_import
 
 import argparse
+import copy
 from functools import partial
 import logging
 import os.path
@@ -257,11 +258,13 @@ class AWSQueryRequest(BaseRequest):
         return self.name
 
     def send(self):
-        self.params = self.flatten_params(self.params)
-        self.params['Action'] = self.action
-        self.params['Version'] = self.API_VERSION or self.service.API_VERSION
-        redacted_params = dict(self.params)
-        for key in self.params:
+        orig_params = self.params
+        params = copy.deepcopy(self.params)
+        params = self.flatten_params(self.params)
+        params['Action'] = self.action
+        params['Version'] = self.API_VERSION or self.service.API_VERSION
+        redacted_params = dict(params)
+        for key in params:
             if key.lower().endswith('password'):
                 # This makes it slightly more obvious that this is redacted by
                 # the framework and not just a string.
@@ -270,10 +273,16 @@ class AWSQueryRequest(BaseRequest):
         self.log.info('parameters: %s', redacted_params)
 
         if self.method.upper() == 'POST':
-            self.log.debug('converting params to POST data')
-            self.body = self.params
-            self.params = None
-        return BaseRequest.send(self)
+            self.log.debug('sending flattened params as form data')
+            self.body = params
+            self.params = {}
+        else:
+            self.log.debug('sending flattened params as query string')
+            self.params = params
+        try:
+            return BaseRequest.send(self)
+        finally:
+            self.params = orig_params
 
     def parse_response(self, response):
         # Parser for list-delimited responses like EC2's
