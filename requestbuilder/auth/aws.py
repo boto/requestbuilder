@@ -416,7 +416,9 @@ class HmacV4Auth(HmacKeyAuth):
         # This doesn't currently support multi-value headers.
         headers = {}
         for key, val in req.headers.iteritems():
-            headers[key.lower().strip()] = val.strip()
+            if key.lower() != 'user-agent':
+                # This lets us generate copypasteable query URLs
+                headers[key.lower().strip()] = val.strip()
         return headers
 
     def _get_canonical_headers(self, req):
