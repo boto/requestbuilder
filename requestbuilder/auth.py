@@ -24,6 +24,7 @@ import os
 import logging
 import re
 import time
+import warnings
 
 import six
 import six.moves.urllib_parse as urlparse
@@ -152,32 +153,23 @@ class S3RestAuth(HmacKeyAuth):
         'uploads', 'versionId', 'versioning', 'versions', 'website'))
 
     def apply_to_request(self, req, service):
-        if req.headers is None:
-            req.headers = {}
-        req.headers['Date'] = email.utils.formatdate()
-        req.headers['Host'] = urlparse.urlparse(req.url).netloc
-        if self.args.get('security_token'):
-            req.headers['x-amz-security-token'] = self.args['security_token']
-        if 'Signature' in req.headers:
-            del req.headers['Signature']
+        self._update_request_before_signing(req)
         c_headers = self.get_canonicalized_headers(req)
-        self.log.debug('canonicalized headers: %s', repr(c_headers))
         c_resource = self.get_canonicalized_resource(req, service)
-        self.log.debug('canonicalized resource: %s', repr(c_resource))
-        to_sign = '\n'.join((req.method,
-                             req.headers.get('Content-MD5', ''),
-                             req.headers.get('Content-Type', ''),
-                             req.headers.get('Date'),
-                             c_headers + c_resource))
+        to_sign = self._get_string_to_sign(req, c_headers, c_resource)
         self.log.debug('string to sign: %s', repr(to_sign))
         signature = self.sign_string(to_sign.encode('utf-8'))
         self.log.debug('b64-encoded signature: %s', signature)
-        req.headers['Authorization'] = 'AWS {0}:{1}'.format(
-            self.args['key_id'], signature)
+        self._apply_signature(req, signature)
         return req
 
     def apply_to_request_params(self, req, service, expiration_datetime):
         # This does not implement security tokens.
+        msg = ('S3RestAuth.apply_to_request_params is deprecated; use '
+               'S3.get_request_url with S3QueryAuth instead')
+        self.log.warn(msg)
+        warnings.warn(msg, DeprecationWarning)
+
         for param in ('AWSAccessKeyId', 'Expires', 'Signature'):
             req.params.pop(param, None)
 
@@ -207,6 +199,26 @@ class S3RestAuth(HmacKeyAuth):
             # This is a guess.  I have no evidence that this actually works.
             req.params['SecurityToken'] = self.args['security_token']
 
+    def _update_request_before_signing(self, req):
+        if not req.headers:
+            req.headers = {}
+        req.headers['Date'] = email.utils.formatdate()
+        req.headers['Host'] = urlparse.urlparse(req.url).netloc
+        if self.args.get('security_token'):
+            req.headers['x-amz-security-token'] = self.args['security_token']
+        req.headers.pop('Signature', None)
+
+    def _get_string_to_sign(self, req, c_headers, c_resource):
+        return '\n'.join((req.method.upper(),
+                          req.headers.get('Content-MD5', ''),
+                          req.headers.get('Content-Type', ''),
+                          req.headers.get('Date'),
+                          c_headers + c_resource))
+
+    def _apply_signature(self, req, signature):
+        req.headers['Authorization'] = 'AWS {0}:{1}'.format(
+            self.args['key_id'], signature)
+
     def get_canonicalized_resource(self, req, service):
         # /bucket/keyname
         parsed_req_path = urlparse.urlparse(req.url).path
@@ -225,9 +237,7 @@ class S3RestAuth(HmacKeyAuth):
             params = req.params
         else:
             # A PreparedRequest
-            parsed = urlparse.urlparse(req.url)
-            params = urlparse.parse_qs(parsed.query, keep_blank_values=True)
-            params = dict((key, vals[0]) for key, vals in params.iteritems())
+            params = _get_params_from_url(req.url)
         if params:
             subresources = []
             for key, val in sorted(params.iteritems()):
@@ -239,10 +249,10 @@ class S3RestAuth(HmacKeyAuth):
                         subresources.append(key + '=' + val)
                 if subresources:
                     resource += '?' + '&'.join(subresources)
+        self.log.debug('canonicalized resource: %s', repr(resource))
         return resource
 
-    @staticmethod
-    def get_canonicalized_headers(req):
+    def get_canonicalized_headers(self, req):
         headers_dict = {}
         for key, val in req.headers.iteritems():
             if key.lower().startswith('x-amz-'):
@@ -252,14 +262,40 @@ class S3RestAuth(HmacKeyAuth):
         for key, vals in sorted(headers_dict.iteritems()):
             headers_strs.append('{0}:{1}'.format(key, ','.join(vals)))
         if headers_strs:
-            return '\n'.join(headers_strs) + '\n'
+            c_headers = '\n'.join(headers_strs) + '\n'
         else:
-            return ''
+            c_headers = ''
+        self.log.debug('canonicalized headers: %s', repr(c_headers))
+        return c_headers
 
     def sign_string(self, to_sign):
         req_hmac = hmac.new(self.args['secret_key'], digestmod=hashlib.sha1)
         req_hmac.update(to_sign)
         return base64.b64encode(req_hmac.digest())
+
+
+class S3QueryAuth(S3RestAuth):
+    DEFAULT_TIMEOUT = 600  # 10 minutes
+
+    def _update_request_before_signing(self, req):
+        timeout = int(self.args.get('timeout')) or self.DEFAULT_TIMEOUT
+        assert timeout > 0
+        params = _get_params_from_url(req.url)
+        params['AWSAccessKeyId'] = self.args['key_id']
+        params['Expires'] = int(time.time() + timeout)
+        params.pop('Signature', None)
+        req.prepare_url(_remove_params_from_url(req.url), params)
+
+    def _get_string_to_sign(self, req, c_headers, c_resource):
+        params = _get_params_from_url(req.url)
+        return '\n'.join((req.method.upper(),
+                          req.headers.get('Content-MD5', ''),
+                          req.headers.get('Content-Type', ''),
+                          params['Expires'],
+                          c_headers + c_resource))
+
+    def _apply_signature(self, req, signature):
+        req.prepare_url(req.url, {'Signature': signature})
 
 
 class QuerySigV2Auth(HmacKeyAuth):
@@ -304,8 +340,7 @@ class QuerySigV2Auth(HmacKeyAuth):
         if req.method == 'POST':
             req.prepare_body(params, {})
         else:
-            req.prepare_url(urlparse.urlunparse((
-                parsed[0], parsed[1], parsed[2], '', '', '')), params)
+            req.prepare_url(_remove_params_from_url(req.url), params)
 
         return req
 
@@ -482,3 +517,22 @@ class QueryHmacV4Auth(HmacV4Auth):
 
     def _apply_signature(self, req, credential, signature):
         req.prepare_url(req.url, {'X-Amz-Signature': signature})
+
+
+def _get_params_from_url(url):
+    """
+    Given a URL, return a dict of parameters and their values.  If a
+    parameter appears more than once all but the first value will be lost.
+    """
+    parsed = urlparse.urlparse(url)
+    params = urlparse.parse_qs(parsed.query, keep_blank_values=True)
+    return dict((key, vals[0]) for key, vals in params.iteritems())
+
+
+def _remove_params_from_url(url):
+    """
+    Return a copy of a URL with its parameters, fragments, and query
+    string removed.
+    """
+    parsed = urlparse.urlparse(url)
+    return urlparse.urlunparse((parsed[0], parsed[1], parsed[2], '', '', ''))
