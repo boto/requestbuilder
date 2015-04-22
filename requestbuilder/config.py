@@ -131,7 +131,9 @@ class ConfigData(object):
             self.log.info('finding global option %s', option)
             value = self.globals.get(option)
             self._memo[id(self.globals)][option] = value
-            if value:
+            if value and redact:
+                self.log.info('  found   %s = <redacted>', option)
+            elif value:
                 self.log.info('  found   %s = %s', option, value)
             else:
                 self.log.info('  novalue for %s', option)
