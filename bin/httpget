@@ -1,6 +1,0 @@
-#!/usr/bin/python -tt
-
-import requestbuilder.commands.http
-
-if __name__ == '__main__':
-    requestbuilder.commands.http.Get.run()
