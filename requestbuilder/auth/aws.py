@@ -475,6 +475,11 @@ class QueryHmacV4Auth(HmacV4Auth):
     def _update_request_before_signing(self, req, credential, payload_sha256,
                                        date_header):
         # We don't do anything with payload_sha256.  Is that bad?
+        if (req.method.upper() == 'POST' and
+                'form-urlencoded' in req.headers.get('Content-Type', '')):
+            self.log.warn('Query string authentication and POST form data '
+                          'are generally mutually exclusive; GET is '
+                          'recommended instead')
         parsed = urlparse.urlparse(req.url)
         req.headers['Host'] = parsed.netloc
         req.headers.pop('Authorization', None)
