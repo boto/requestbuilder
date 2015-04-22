@@ -23,11 +23,9 @@ import hmac
 import os
 import logging
 import re
-import tempfile
 import time
 
 import six
-import six.moves.urllib as urllib
 import six.moves.urllib_parse as urlparse
 
 from requestbuilder import Arg
@@ -168,8 +166,8 @@ class S3RestAuth(HmacKeyAuth):
         self.log.debug('string to sign: %s', repr(to_sign))
         signature = self.sign_string(to_sign.encode('utf-8'))
         self.log.debug('b64-encoded signature: %s', signature)
-        req.headers['Authorization'] = 'AWS {0}:{1}'.format(self.args['key_id'],
-                                                            signature)
+        req.headers['Authorization'] = 'AWS {0}:{1}'.format(
+            self.args['key_id'], signature)
 
     def apply_to_request_params(self, req, service, expiration_datetime):
         # This does not implement security tokens.
@@ -223,7 +221,6 @@ class S3RestAuth(HmacKeyAuth):
                         subresources.append(key)
                     else:
                         print '{0}={1}'.format(key, val), key + '=' + val
-                        #subresources.append('{0}={1}'.format(key, val))
                         subresources.append(key + '=' + val)
                 if subresources:
                     resource += '?' + '&'.join(subresources)

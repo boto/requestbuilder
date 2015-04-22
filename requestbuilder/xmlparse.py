@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2013, Eucalyptus Systems, Inc.
+# Copyright (c) 2012-2015, Eucalyptus Systems, Inc.
 #
 # Permission to use, copy, modify, and/or distribute this software for
 # any purpose with or without fee is hereby granted, provided that the
@@ -66,7 +66,8 @@ def parse_aws_xml(xml_stream, list_item_tags=None):
                 stack.append((tag, {}))
             else:  # end
                 if tag in list_item_tags:
-                    # We're ending a list item, so append it to stack[-2]'s list
+                    # We're ending a list item, so append it to stack[-2]'s
+                    # list
                     stack[-2][1].setdefault(tag, [])
                     if stack[-1][1] == {}:
                         # No inner elements; use text instead

@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2014, Eucalyptus Systems, Inc.
+# Copyright (c) 2012-2015, Eucalyptus Systems, Inc.
 #
 # Permission to use, copy, modify, and/or distribute this software for
 # any purpose with or without fee is hereby granted, provided that the
@@ -20,13 +20,14 @@ import subprocess
 
 __version__ = '0.2.3'
 
+
 if '__file__' in globals():
     # Check if this is a git repo; maybe we can get more precise version info
     try:
         repo_path = os.path.join(os.path.dirname(__file__), '..')
+        env = {'GIT_DIR': os.path.join(repo_path, '.git')}
         git = subprocess.Popen(['git', 'describe'], stdout=subprocess.PIPE,
-                               stderr=subprocess.PIPE,
-                               env={'GIT_DIR': os.path.join(repo_path, '.git')})
+                               stderr=subprocess.PIPE, env=env)
         git.wait()
         git.stderr.read()
         if git.returncode == 0:
@@ -42,10 +43,10 @@ if '__file__' in globals():
 # Indicates a parameter that should be sent to the server without a value.
 # Contrast this with empty strings, with are omitted from requests entirely.
 EMPTY = type('EMPTY', (), {'__repr__': lambda self: "''",
-                           '__str__':  lambda self: ''})()
+                           '__str__': lambda self: ''})()
 
 # Getters used for arg routing
-PARAMS  = operator.attrgetter('params')
+PARAMS = operator.attrgetter('params')
 SESSION = operator.attrgetter('service.session_args')
 
 
@@ -108,19 +109,19 @@ class MutuallyExclusiveArgList(list):
 
 class Filter(object):
     '''
-    An AWS API filter.  For APIs that support filtering by name/value
-    pairs, adding a Filter to a request's list of filters will allow a
-    user to send an output filter to the server with '--filter name=value'
-    at the command line.
+    An AWS query API filter.  For APIs that support filtering by
+    name/value pairs, adding a Filter to a request's list of filters will
+    allow a user to send an output filter to the server with '--filter
+    name=value' at the command line.
 
     The value specified by the 'dest' argument (or the 'name' argument,
     if none is given) is used as the name of a filter in queries.
     '''
     def __init__(self, name, type=str, choices=None, help=None):
-        self.name    = name
-        self.type    = type
+        self.name = name
+        self.type = type
         self.choices = choices
-        self.help    = help
+        self.help = help
 
     def matches_argval(self, argval):
         return argval.startswith(self.name + '=')
@@ -142,12 +143,12 @@ class Filter(object):
             value = self.type(value_str)
         except ValueError:
             msg = "{0} filter value '{1}' must have type {2}".format(
-                    name, value_str, self.type.__name__)
+                name, value_str, self.type.__name__)
             raise argparse.ArgumentTypeError(msg)
         if self.choices and value not in self.choices:
             msg = "{0} filter value '{1}' must match one of {2}".format(
-                    name, value,
-                    ', '.join([str(choice) for choice in self.choices]))
+                name, value,
+                ', '.join([str(choice) for choice in self.choices]))
             raise argparse.ArgumentTypeError(msg)
         if value == '':
             value = EMPTY

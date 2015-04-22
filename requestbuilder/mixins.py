@@ -209,7 +209,6 @@ if 'progressbar' in sys.modules:
             self.maxval = self.currval
             progressbar.ProgressBar.finish(self)
 
-
     class _IndeterminateBouncingBar(progressbar.BouncingBar):
         '''
         A BouncingBar that moves exactly one space each time it updates,
@@ -227,7 +226,6 @@ if 'progressbar' in sys.modules:
             pbar.currval = orig_currval
             self.__update_count += 1
             return retval
-
 
     class _FileSize(progressbar.Widget):
         PREFIXES = ' kMGTPEZY'

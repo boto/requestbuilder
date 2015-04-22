@@ -1,4 +1,4 @@
-# Copyright (c) 2013, Eucalyptus Systems, Inc.
+# Copyright (c) 2013-2015, Eucalyptus Systems, Inc.
 #
 # Permission to use, copy, modify, and/or distribute this software for
 # any purpose with or without fee is hereby granted, provided that the
@@ -17,8 +17,8 @@ class PaginatedResponse(dict):
     def __init__(self, request, pages, item_names):
         assert len(pages) > 0
         self.iter_cache = dict((key, []) for key in item_names)
-        self.request    = request
-        self.stack      = list(reversed(pages))
+        self.request = request
+        self.stack = list(reversed(pages))
         self.fetch_next_page()  # get an initial response
         for key in self.iter_cache:
             self[key] = ResponseItemGenerator(key, self)
@@ -40,7 +40,7 @@ class PaginatedResponse(dict):
 
 class ResponseItemGenerator(object):
     def __init__(self, item_name, response_dict):
-        self.item_name     = item_name
+        self.item_name = item_name
         self.response_dict = response_dict
 
     def next(self):

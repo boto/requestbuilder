@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2014, Eucalyptus Systems, Inc.
+# Copyright (c) 2012-2015, Eucalyptus Systems, Inc.
 #
 # Permission to use, copy, modify, and/or distribute this software for
 # any purpose with or without fee is hereby granted, provided that the
@@ -70,13 +70,13 @@ class BaseCommand(object):
     __CONFIGURED_FROM_CLI = False
 
     def __init__(self, config=None, loglevel=None, _do_cli=False, **kwargs):
-        self.args          = kwargs
-        self.config        = config  # created by _process_configfiles if None
-        self.log           = None  # created by _configure_logging
-        self.suite         = self.SUITE()
-        self._arg_routes   = {}  # arg name -> tuple of callables or dicts
-        self._cli_parser   = None  # created by _build_parser
-        self.__debug       = False
+        self.args = kwargs
+        self.config = config  # created by _process_configfiles if None
+        self.log = None  # created by _configure_logging
+        self.suite = self.SUITE()
+        self._arg_routes = {}  # arg name -> tuple of callables or dicts
+        self._cli_parser = None  # created by _build_parser
+        self.__debug = False
 
         self._configure_logging(loglevel)
         self._process_configfiles()
@@ -155,9 +155,9 @@ class BaseCommand(object):
     def _build_parser(self):
         description = '\n\n'.join([textwrap.fill(textwrap.dedent(para))
                                    for para in self.DESCRIPTION.split('\n\n')])
-        parser = argparse.ArgumentParser(description=description,
-                formatter_class=argparse.RawDescriptionHelpFormatter,
-                usage=self.USAGE, add_help=False)
+        parser = argparse.ArgumentParser(
+            description=description, usage=self.USAGE, add_help=False,
+            formatter_class=argparse.RawDescriptionHelpFormatter)
         arg_objs = self.collect_arg_objs()
         self.populate_parser(parser, arg_objs)
         # Low-level basic args that affect the core of the framework
@@ -165,8 +165,8 @@ class BaseCommand(object):
         parser.add_argument('--debug', action='store_true', dest='_debug',
                             default=argparse.SUPPRESS,
                             help='show debugging output')
-        parser.add_argument('--debugger', action='store_true', dest='_debugger',
-                            default=argparse.SUPPRESS,
+        parser.add_argument('--debugger', action='store_true',
+                            dest='_debugger', default=argparse.SUPPRESS,
                             help='launch interactive debugger on error')
         parser.add_argument('--version', action='version',
                             version=self.suite.format_version(),
@@ -207,7 +207,7 @@ class BaseCommand(object):
                 return [arg]
         elif isinstance(arglike_obj, MutuallyExclusiveArgList):
             exgroup = parser.add_mutually_exclusive_group(
-                    required=arglike_obj.is_required)
+                required=arglike_obj.is_required)
             args = []
             for group_arg in arglike_obj:
                 args.extend(self.__add_arg_to_cli_parser(group_arg, exgroup))
@@ -236,7 +236,7 @@ class BaseCommand(object):
                         {'__repr__': lambda self: '<redacted>'})()
         for key in list(cli_args.keys()):
             if (('password' in key.lower() or 'secret' in key.lower()) and
-                cli_args[key] is not None):
+                    cli_args[key] is not None):
                 # This makes it slightly more obvious that this is redacted by
                 # the framework and not just a string by removing quotes.
                 cli_args[key] = redacted

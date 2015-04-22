@@ -1,4 +1,4 @@
-# Copyright (c) 2013-2014, Eucalyptus Systems, Inc.
+# Copyright (c) 2013-2015, Eucalyptus Systems, Inc.
 #
 # Permission to use, copy, modify, and/or distribute this software for
 # any purpose with or without fee is hereby granted, provided that the
@@ -29,9 +29,9 @@ def add_default_routes(arglike_obj, default_routes):
 def aggregate_subclass_fields(cls, field_name):
     values = []
     # pylint doesn't know about classes' built-in mro() method
-    # pylint: disable-msg=E1101
+    # pylint: disable=E1101
     for m_class in cls.mro():
-        # pylint: enable-msg=E1101
+        # pylint: enable=E1101
         if field_name in vars(m_class):
             values.extend(getattr(m_class, field_name))
     return values

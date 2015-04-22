@@ -1,4 +1,4 @@
-# Copyright (c) 2012, Eucalyptus Systems, Inc.
+# Copyright (c) 2012-2015, Eucalyptus Systems, Inc.
 #
 # Permission to use, copy, modify, and/or distribute this software for
 # any purpose with or without fee is hereby granted, provided that the
@@ -49,8 +49,8 @@ class ProgressiveStreamHandler(logging.StreamHandler):
 
 class ColoringFormatter(logging.Formatter):
     LOG_COLORS = [(logging.ERROR, '\033[91m'),
-                  (logging.WARN,  '\033[93m'),
-                  (logging.INFO,  '\033[92m'),
+                  (logging.WARN, '\033[93m'),
+                  (logging.INFO, '\033[92m'),
                   (logging.DEBUG, '\033[94m')]
 
     def format(self, record):
@@ -64,7 +64,7 @@ class ColoringFormatter(logging.Formatter):
 def configure_root_logger(use_color=False):
     logfmt = '%(asctime)s %(levelname)-7s %(name)s %(message)s'
     rootlogger = logging.getLogger('')
-    handler    = ProgressiveStreamHandler()
+    handler = ProgressiveStreamHandler()
     if use_color:
         formatter = ColoringFormatter(logfmt)
     else:

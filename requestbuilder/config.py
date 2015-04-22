@@ -101,25 +101,25 @@ class ConfigData(object):
             elif section.startswith('region '):
                 region = section.split()[1]
                 if any(chunk == '' for chunk in region.split(':')):
-                    raise ValueError(('configuration file region {0} must not '
-                                      'contain an empty namespace').format(
-                                     repr(region)))
+                    raise ValueError(
+                        'configuration file region {0} must not contain '
+                        'an empty namespace'.format(repr(region)))
                 if '@' in region:
-                    raise ValueError(('configuration file region {0} must not '
-                                      'contain @ characters').format(
-                                     repr(region)))
+                    raise ValueError(
+                        'configuration file region {0} must not contain '
+                        '@ characters'.format(repr(region)))
                 self.regions[region] = dict(parser.items(section))
                 self.regions[region].setdefault('name', region.rsplit(':')[-1])
             elif section.startswith('user '):
                 user = section.split()[1]
                 if any(chunk == '' for chunk in user.split(':')):
-                    raise ValueError(('configuration file user {0} must not '
-                                      'contain an empty namespace').format(
-                                     repr(user)))
+                    raise ValueError(
+                        'configuration file user {0} must not contain '
+                        'an empty namespace'.format(repr(user)))
                 if '@' in user:
-                    raise ValueError(('configuration file user {0} must not '
-                                      'contain @ characters').format(
-                                     repr(user)))
+                    raise ValueError(
+                        'configuration file user {0} must not contain '
+                        '@ characters'.format(repr(user)))
                 self.users[user] = dict(parser.items(section))
             # Ignore unrecognized sections for forward compatibility
 
@@ -144,7 +144,8 @@ class ConfigData(object):
             return self._memo[id(confdict)][(section, option)]
         else:
             if confdict_log_name is not None:
-                self.log.info('finding %s option %s', confdict_log_name,option)
+                self.log.info('finding %s option %s', confdict_log_name,
+                              option)
             values = self.__lookup(confdict, section, option, redact=redact,
                                    seen=seen)
             self._memo[id(confdict)][(section, option)] = values

@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2014, Eucalyptus Systems, Inc.
+# Copyright (c) 2012-2015, Eucalyptus Systems, Inc.
 #
 # Permission to use, copy, modify, and/or distribute this software for
 # any purpose with or without fee is hereby granted, provided that the
@@ -30,7 +30,6 @@ import six
 from requestbuilder.exceptions import (ClientError, ServerError,
                                        ServiceInitError)
 from requestbuilder.mixins import RegionConfigurableMixin
-from requestbuilder.util import add_default_routes, aggregate_subclass_fields
 
 
 class BaseService(RegionConfigurableMixin):
@@ -48,10 +47,10 @@ class BaseService(RegionConfigurableMixin):
 
     def __init__(self, config, loglevel=None, max_retries=None, timeout=None,
                  **kwargs):
-        self.args      = kwargs
-        self.config    = config
-        self.endpoint  = None
-        self.log       = logging.getLogger(self.__class__.__name__)
+        self.args = kwargs
+        self.config = config
+        self.endpoint = None
+        self.log = logging.getLogger(self.__class__.__name__)
         if loglevel is not None:
             self.log.level = loglevel
         self.max_retries = max_retries
@@ -156,7 +155,7 @@ class BaseService(RegionConfigurableMixin):
                 data_file_offset = None
             while True:
                 for attempt_no, delay in enumerate(
-                    _generate_delays(max_tries), 1):
+                        _generate_delays(max_tries), 1):
                     # Use exponential backoff if this is a retry
                     if delay > 0:
                         self.log.debug('will retry after %.3f seconds', delay)
@@ -175,7 +174,8 @@ class BaseService(RegionConfigurableMixin):
                     # because we have to re-sign requests when their URLs
                     # change.
                     redirects_left -= 1
-                    parsed_rdr = urlparse.urlparse(response.headers['Location'])
+                    parsed_rdr = urlparse.urlparse(
+                        response.headers['Location'])
                     parsed_url = urlparse.urlparse(url)
                     new_url_bits = []
                     for rdr_bit, url_bit in zip(parsed_rdr, parsed_url):

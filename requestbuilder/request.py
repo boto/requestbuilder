@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2014, Eucalyptus Systems, Inc.
+# Copyright (c) 2012-2015, Eucalyptus Systems, Inc.
 #
 # Permission to use, copy, modify, and/or distribute this software for
 # any purpose with or without fee is hereby granted, provided that the
@@ -65,24 +65,23 @@ class BaseRequest(BaseCommand):
     '''
 
     SERVICE_CLASS = BaseService
-    AUTH_CLASS    = None
-    NAME          = None
-    METHOD        = 'GET'
+    AUTH_CLASS = None
+    NAME = None
+    METHOD = 'GET'
 
     DEFAULT_ROUTES = (PARAMS,)
     LIST_TAGS = []
-
 
     def __init__(self, service=None, auth=None, **kwargs):
         self.auth = auth
         self.service = service
         # Parts of the HTTP request to be sent to the server.
-        self.method    = self.METHOD
-        self.path      = None
-        self.headers   = {}
-        self.params    = {}
-        self.body      = ''
-        self.files     = {}
+        self.method = self.METHOD
+        self.path = None
+        self.headers = {}
+        self.params = {}
+        self.body = ''
+        self.files = {}
 
         # HTTP response obtained from the server
         self.response = None
@@ -180,8 +179,7 @@ class BaseRequest(BaseCommand):
             return self.handle_server_error(err)
 
     def handle_server_error(self, err):
-        self.log.debug('-- response content --\n',
-                       extra={'append': True})
+        self.log.debug('-- response content --\n', extra={'append': True})
         self.log.debug(self.response.text, extra={'append': True})
         self.log.debug('-- end of response content --')
         self.log.info('result: failure')
@@ -244,10 +242,11 @@ class AWSQueryRequest(BaseRequest):
     def populate_parser(self, parser, arg_objs):
         BaseRequest.populate_parser(self, parser, arg_objs)
         if self.FILTERS:
-            parser.add_argument('--filter', metavar='NAME=VALUE',
-                    action='append', dest='filters',
-                    help='restrict results to those that meet criteria',
-                    type=partial(_parse_filter, filter_objs=self.FILTERS))
+            parser.add_argument(
+                '--filter', metavar='NAME=VALUE',
+                action='append', dest='filters',
+                help='restrict results to those that meet criteria',
+                type=partial(_parse_filter, filter_objs=self.FILTERS))
             parser.epilog = self.__build_filter_help()
             self._arg_routes['filters'] = (None,)
 
@@ -270,15 +269,15 @@ class AWSQueryRequest(BaseRequest):
             if key.lower().endswith('password'):
                 # This makes it slightly more obvious that this is redacted by
                 # the framework and not just a string.
-                redacted_params[key] = type('REDACTED', (),
-                        {'__repr__': lambda self: '<redacted>'})()
+                redacted_params[key] = type(
+                    'REDACTED', (), {'__repr__': lambda self: '<redacted>'})()
         self.log.info('parameters: %s', redacted_params)
         return params
 
     def parse_response(self, response):
         # Parser for list-delimited responses like EC2's
-        response_dict = self.log_and_parse_response(response,
-                parse_listdelimited_aws_xml, list_tags=self.LIST_TAGS)
+        response_dict = self.log_and_parse_response(
+            response, parse_listdelimited_aws_xml, list_tags=self.LIST_TAGS)
         # Strip off the root element
         assert len(response_dict) == 1
         return response_dict[list(response_dict.keys())[0]]
@@ -383,13 +382,14 @@ class AWSQueryRequest(BaseRequest):
                 if len(filter_obj.name) <= 20:
                     # Short name; start on same line and pad two spaces
                     firstline = '  {0:<20}  '.format(filter_obj.name)
-                    wrapper = textwrap.TextWrapper(fix_sentence_endings=True,
-                        initial_indent=firstline, subsequent_indent=(' ' * 24))
+                    wrapper = textwrap.TextWrapper(
+                        fix_sentence_endings=True, initial_indent=firstline,
+                        subsequent_indent=(' ' * 24))
                 else:
                     # Long name; start on next line
                     helplines.append('  ' + filter_obj.name)
-                    wrapper = textwrap.TextWrapper(fix_sentence_endings=True,
-                        initial_indent=(' ' * 24),
+                    wrapper = textwrap.TextWrapper(
+                        fix_sentence_endings=True, initial_indent=(' ' * 24),
                         subsequent_indent=(' ' * 24))
                 helplines.extend(wrapper.wrap(content))
             else:
@@ -433,10 +433,10 @@ def _process_filters(cli_filters):
 
 class _IteratorFileObjAdapter(object):
     def __init__(self, source):
-        self._source  = source
+        self._source = source
         self._buflist = []
-        self._closed  = False
-        self._len     = 0
+        self._closed = False
+        self._len = 0
 
     def __enter__(self):
         return self
@@ -459,7 +459,7 @@ class _IteratorFileObjAdapter(object):
                 self._buflist.append(chunk)
             result = ''.join(self._buflist)
             self._buflist = []
-            self._len     = 0
+            self._len = 0
         else:
             while self._len < size:
                 try:
@@ -468,13 +468,13 @@ class _IteratorFileObjAdapter(object):
                     self._len += len(chunk)
                 except StopIteration:
                     break
-            result    = ''.join(self._buflist)
+            result = ''.join(self._buflist)
             extra_len = len(result) - size
             self._buflist = []
-            self._len     = 0
+            self._len = 0
             if extra_len > 0:
                 self._buflist = [result[-extra_len:]]
-                self._len     = extra_len
+                self._len = extra_len
                 result = result[:-extra_len]
         return result
 
@@ -482,8 +482,8 @@ class _IteratorFileObjAdapter(object):
 class _ReadLoggingFileWrapper(object):
     def __init__(self, fileobj, logger, level):
         self.fileobj = fileobj
-        self.logger  = logger
-        self.level   = level
+        self.logger = logger
+        self.level = level
 
     def read(self, size=-1):
         chunk = self.fileobj.read(size)
