@@ -383,6 +383,8 @@ class HmacV4Auth(HmacKeyAuth):
         req.headers.pop('Authorization', None)
         req.headers['X-Amz-Content-SHA256'] = payload_sha256
         req.headers['X-Amz-Date'] = date_header
+        if self.args.get('security_token'):
+            req.headers['X-Amz-Security-Token'] = self.args['security_token']
 
     def _apply_signature(self, req, credential, signature):
         auth_header = ', '.join((
@@ -495,6 +497,8 @@ class QueryHmacV4Auth(HmacV4Auth):
             'X-Amz-SignedHeaders': self._get_signed_headers(req)}
         if self.args.get('timeout'):
             params['X-Amz-Expires'] = self.args['timeout']
+        if self.args.get('security_token'):
+            params['X-Amz-Security-Token'] = self.args['security_token']
         req.prepare_url(req.url, params)
 
     def _apply_signature(self, req, credential, signature):
