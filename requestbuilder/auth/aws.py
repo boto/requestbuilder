@@ -350,13 +350,6 @@ class HmacV4Auth(HmacKeyAuth):
     """
 
     def apply_to_request(self, req, service):
-        if not service.region_name:
-            self.log.error('a region name is required to use sigv4')
-            raise AuthError(
-                "region name is required; either use euca2ools.ini(5) "
-                "to supply the service's URL or prepend the region "
-                "name and :: to the URL (e.g. mycloud::{0})"
-                .format(service.endpoint))
         if not service.NAME:
             self.log.critical('service class %s must have a NAME attribute '
                               'to use sigv4', service.__class__.__name__)
@@ -415,8 +408,18 @@ class HmacV4Auth(HmacKeyAuth):
         req.headers['Authorization'] = auth_header
 
     def _build_scope(self, service, timestamp):
+        if service.region_name:
+            region = service.region_name
+        elif os.getenv('AWS_AUTH_REGION'):
+            region = os.getenv('AWS_AUTH_REGION')
+        else:
+            self.log.error('a region name is required to use sigv4')
+            raise AuthError(
+                "region name is required; either use euca2ools.ini(5) "
+                "to supply the service's URL or set AWS_AUTH_REGION "
+                "in the environment")
         scope = (time.strftime('%Y%m%d', time.gmtime(timestamp)),
-                 service.region_name, service.NAME, 'aws4_request')
+                 region, service.NAME, 'aws4_request')
         self.log.debug('scope: %s', '/'.join(scope))
         return scope
 
