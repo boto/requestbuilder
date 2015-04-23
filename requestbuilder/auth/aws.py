@@ -51,6 +51,8 @@ class HmacKeyAuth(BaseAuth):
         kwargs.setdefault('key_id', other.args.get('key_id'))
         kwargs.setdefault('secret_key', other.args.get('secret_key'))
         kwargs.setdefault('security_token', other.args.get('security_token'))
+        kwargs.setdefault('credential_expiration',
+                          other.args.get('credential_expiration'))
         new = cls(other.config, **kwargs)
         new.configure()
         return new
@@ -68,6 +70,9 @@ class HmacKeyAuth(BaseAuth):
                                    os.getenv('AWS_SECRET_KEY'))
         self.args['security_token'] = (self.args.get('security_token') or
                                        os.getenv('AWS_SECURITY_TOKEN'))
+        self.args['credential_expiration'] = (
+            self.args.get('credential_expiration') or
+            os.getenv('AWS_CREDENTIAL_EXPIRATION'))
         # See if an AWS credential file was given in the environment
         self.configure_from_aws_credential_file()
         # Try the requestbuilder config file next
@@ -77,6 +82,22 @@ class HmacKeyAuth(BaseAuth):
             raise AuthError('missing access key ID; please supply one with -I')
         if not self.args.get('secret_key'):
             raise AuthError('missing secret key; please supply one with -S')
+        if self.args.get('credential_expiration'):
+            expiration = None
+            for fmt in ('%Y-%m-%dT%H:%M:%S.%fZ', '%Y-%m-%dT%H:%M:%SZ'):
+                try:
+                    expiration = datetime.datetime.strptime(
+                        self.args['credential_expiration'], fmt)
+                    break
+                except ValueError:
+                    continue
+            else:
+                self.log.warn(
+                    'failed to parse credential expiration time '
+                    '\'{0}\'; proceeding without validation'.format(
+                    self.args['credential_expiration']))
+            if expiration and expiration < datetime.datetime.utcnow():
+                raise AuthError('credentials have expired')
 
     def configure_from_aws_credential_file(self):
         if 'AWS_CREDENTIAL_FILE' in os.environ:
