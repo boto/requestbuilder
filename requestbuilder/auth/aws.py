@@ -331,8 +331,11 @@ class HmacV4Auth(HmacKeyAuth):
     def apply_to_request(self, req, service):
         if not service.region_name:
             self.log.error('a region name is required to use sigv4')
-            raise AuthError('region name is required; use a config file '
-                            'or prepend the region name and :: to the URL')
+            raise AuthError(
+                "region name is required; either use euca2ools.ini(5) "
+                "to supply the service's URL or prepend the region "
+                "name and :: to the URL (e.g. mycloud::{0})"
+                .format(service.endpoint))
         if not service.NAME:
             self.log.critical('service class %s must have a NAME attribute '
                               'to use sigv4', service.__class__.__name__)
