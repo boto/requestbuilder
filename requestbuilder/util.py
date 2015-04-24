@@ -35,22 +35,3 @@ def aggregate_subclass_fields(cls, field_name):
         if field_name in vars(m_class):
             values.extend(getattr(m_class, field_name))
     return values
-
-
-def set_userregion(config, userregion, overwrite=False):
-    msg = ('set_userregion is deprecated; use '
-           'RegionConfigurableMixin.update_config_view instead')
-    config.log.warn(msg)
-    warnings.warn(msg, DeprecationWarning)
-    if userregion is None:
-        return
-    if '@' in userregion:
-        user, region = userregion.split('@', 1)
-    else:
-        user = None
-        region = userregion
-    if user and (config.user is None or overwrite):
-        config.user = user
-    if region and (config.region is None or overwrite):
-        config.region = region
-    return user, region
