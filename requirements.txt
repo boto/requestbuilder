@@ -1,2 +1,2 @@
 requests>=1
-six
+six>=1.5
