@@ -38,7 +38,6 @@ class BaseService(RegionConfigurableMixin):
     API_VERSION = ''
     MAX_RETRIES = 2
     TIMEOUT = 30  # socket timeout in seconds
-    AUTH_CLASS = None  # deprecated; use BaseRequest.AUTH_CLASS instead
 
     REGION_ENVVAR = None
     URL_ENVVAR = None

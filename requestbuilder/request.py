@@ -94,18 +94,8 @@ class BaseRequest(BaseCommand):
         if self.service is None and self.SERVICE_CLASS is not None:
             self.service = self.SERVICE_CLASS(self.config,
                                               loglevel=self.log.level)
-        if self.auth is None:
-            if self.AUTH_CLASS is not None:
-                self.auth = self.AUTH_CLASS(self.config,
-                                            loglevel=self.log.level)
-            elif self.SERVICE_CLASS.AUTH_CLASS is not None:
-                # Backward compatibility
-                msg = ('BaseService.AUTH_CLASS is deprecated; use '
-                       'BaseRequest.AUTH_CLASS instead')
-                self.log.warn(msg)
-                warnings.warn(msg, DeprecationWarning)
-                self.auth = self.SERVICE_CLASS.AUTH_CLASS(
-                    self.config, loglevel=self.log.level)
+        if self.auth is None and self.AUTH_CLASS is not None:
+            self.auth = self.AUTH_CLASS(self.config, loglevel=self.log.level)
         BaseCommand._post_init(self)
 
     @classmethod
