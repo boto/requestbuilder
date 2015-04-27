@@ -71,7 +71,6 @@ class BaseRequest(BaseCommand):
     METHOD = 'GET'
 
     DEFAULT_ROUTES = (PARAMS,)
-    LIST_TAGS = []
 
     def __init__(self, service=None, auth=None, **kwargs):
         self.auth = auth
@@ -235,6 +234,7 @@ class BaseRequest(BaseCommand):
 class AWSQueryRequest(BaseRequest):
     API_VERSION = None
     FILTERS = []
+    LIST_TAGS = []
 
     def _populate_parser(self, parser, arg_objs):
         BaseRequest._populate_parser(self, parser, arg_objs)
