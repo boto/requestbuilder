@@ -236,8 +236,8 @@ class AWSQueryRequest(BaseRequest):
     API_VERSION = None
     FILTERS = []
 
-    def populate_parser(self, parser, arg_objs):
-        BaseRequest.populate_parser(self, parser, arg_objs)
+    def _populate_parser(self, parser, arg_objs):
+        BaseRequest._populate_parser(self, parser, arg_objs)
         if self.FILTERS:
             parser.add_argument(
                 '--filter', metavar='NAME=VALUE',

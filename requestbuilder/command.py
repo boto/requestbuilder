@@ -22,6 +22,7 @@ import signal
 import sys
 import textwrap
 import traceback
+import warnings
 try:
     import epdb
 except ImportError:
@@ -159,7 +160,7 @@ class BaseCommand(object):
             description=description, usage=self.USAGE, add_help=False,
             formatter_class=argparse.RawDescriptionHelpFormatter)
         arg_objs = self.collect_arg_objs()
-        self.populate_parser(parser, arg_objs)
+        self._populate_parser(parser, arg_objs)
         # Low-level basic args that affect the core of the framework
         # These don't actually show up once CLI args finish processing.
         parser.add_argument('--debug', action='store_true', dest='_debug',
@@ -188,6 +189,12 @@ class BaseCommand(object):
         return arg_objs
 
     def populate_parser(self, parser, arg_objs):
+        msg = 'BaseCommand.populate_parser is deprecated'
+        self.log.warn(msg)
+        warnings.warn(msg, DeprecationWarning)  # deprecated in 0.3
+        return self._populate_parser(parser, arg_objs)
+
+    def _populate_parser(self, parser, arg_objs):
         for arg_obj in arg_objs:
             self.__add_arg_to_cli_parser(arg_obj, parser)
 
