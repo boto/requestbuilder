@@ -415,7 +415,7 @@ class HmacV4Auth(HmacKeyAuth):
         else:
             self.log.error('a region name is required to use sigv4')
             raise AuthError(
-                "region name is required; either use euca2ools.ini(5) "
+                "region name is required; either use a config file "
                 "to supply the service's URL or set AWS_AUTH_REGION "
                 "in the environment")
         scope = (time.strftime('%Y%m%d', time.gmtime(timestamp)),
