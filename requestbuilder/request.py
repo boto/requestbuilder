@@ -148,6 +148,9 @@ class BaseRequest(BaseCommand):
 
     @property
     def status(self):
+        msg = 'BaseRequest.status is deprecated, use response status'
+        self.log.warn(msg)
+        warnings.warn(msg, DeprecationWarning)  # deprecated in 0.3
         if self.response is not None:
             return self.response.status
         else:
