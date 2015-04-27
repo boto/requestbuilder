@@ -223,6 +223,9 @@ class HmacV1Auth(HmacKeyAuth):
         if parsed_svc_path.endswith('/'):
             # The leading / got stripped off
             resource = '/' + resource
+        if not resource:
+            # This resource does not address a bucket
+            resource = '/'
 
         # Now append sub-resources, a.k.a. query string parameters
         if getattr(req, 'params', None):
