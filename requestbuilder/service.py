@@ -231,9 +231,13 @@ class BaseService(RegionConfigurableMixin):
     def __log_and_prepare_request(self, method, url, params, data, files,
                                   headers, auth):
         hooks = {'response': functools.partial(_log_response_data, self.log)}
+        if auth:
+            bound_auth = auth.bind_to_service(self)
+        else:
+            bound_auth = None
         request = requests.Request(method=method, url=url, params=params,
                                    data=data, files=files, headers=headers,
-                                   auth=auth.bind_to_service(self))
+                                   auth=bound_auth)
         p_request = request.prepare()
         p_request.hooks = {'response': hooks['response']}
         self.log.debug('request method: %s', request.method)
