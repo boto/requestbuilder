@@ -58,28 +58,7 @@ class HmacKeyAuth(BaseAuth):
         return new
 
     def configure(self):
-        # self.args gets highest precedence.  There's nothing to do for
-        # that apart from not overwriting it.
-        # Environment comes next
-        self.args['key_id'] = (self.args.get('key_id') or
-                               os.getenv('AWS_ACCESS_KEY_ID') or
-                               os.getenv('AWS_ACCESS_KEY'))
-        self.args['secret_key'] = (self.args.get('secret_key') or
-                                   os.getenv('AWS_SECRET_ACCESS_KEY') or
-                                   os.getenv('AWS_SECRET_KEY'))
-        self.args['security_token'] = (self.args.get('security_token') or
-                                       os.getenv('AWS_SECURITY_TOKEN'))
-        self.args['credential_expiration'] = (
-            self.args.get('credential_expiration') or
-            os.getenv('AWS_CREDENTIAL_EXPIRATION'))
-        # See if an AWS credential file was given in the environment
-        self.configure_from_aws_credential_file()
-        # Try the config file
-        self.args['key_id'] = (self.args.get('key_id') or
-                               self.config.get_user_option('key-id'))
-        self.args['secret_key'] = (self.args.get('secret_key') or
-                                   self.config.get_user_option('secret-key',
-                                                               redact=True))
+        self.__populate_auth_args()
 
         if not self.args.get('key_id'):
             raise AuthError('missing access key ID; please supply one with -I')
@@ -120,6 +99,57 @@ class HmacKeyAuth(BaseAuth):
                         elif (key.strip() == 'AWSSecretKey' and
                               not self.args.get('secret_key')):
                             self.args['secret_key'] = val.strip()
+            return path
+
+    def __populate_auth_args(self):
+        """
+        Try to get auth info from each source in turn until one provides
+        both a key ID and a secret key.  After each time a source fails
+        to provide enough info we wipe self.args out so we don't wind up
+        mixing info from multiple sources.
+        """
+
+        # self.args gets highest precedence
+        if self.__reset_unless_ready():
+            self.log.debug('using auth info provided directly')
+            return
+        # Environment comes next
+        self.args['key_id'] = (os.getenv('AWS_ACCESS_KEY_ID') or
+                               os.getenv('AWS_ACCESS_KEY'))
+        self.args['secret_key'] = (os.getenv('AWS_SECRET_ACCESS_KEY') or
+                                   os.getenv('AWS_SECRET_KEY'))
+        self.args['security_token'] = os.getenv('AWS_SECURITY_TOKEN')
+        self.args['credential_expiration'] = \
+            os.getenv('AWS_CREDENTIAL_EXPIRATION')
+        if self.__reset_unless_ready():
+            self.log.debug('using auth info from environment')
+            return
+        # See if an AWS credential file was given in the environment
+        aws_credfile_path = self.configure_from_aws_credential_file()
+        if aws_credfile_path and self.__reset_unless_ready():
+            self.log.debug('using auth info from AWS credential file %s',
+                           aws_credfile_path)
+            return
+        # Try the config file
+        self.args['key_id'] = self.config.get_user_option('key-id')
+        self.args['secret_key'] = self.config.get_user_option('secret-key',
+                                                              redact=True)
+        if self.__reset_unless_ready():
+            self.log.debug('using auth info from configuration')
+            return
+
+    def __reset_unless_ready(self):
+        """
+        If both an access key ID and a secret key are set in self.args
+        return True.  Otherwise, clear auth info from self.args and
+        return False.
+        """
+        if self.args.get('key_id') and self.args.get('secret_key'):
+            return True
+        for arg in ('key_id', 'secret_key', 'security_token',
+                    'credential_expiration'):
+            self.args[arg] = None
+        return False
 
 
 class HmacV1Auth(HmacKeyAuth):
