@@ -58,10 +58,9 @@ class HmacKeyAuth(BaseAuth):
         return new
 
     def configure(self):
-        # If the current user/region was explicitly set (e.g. with --region),
-        # use that first
-        self.configure_from_configfile(only_if_explicit=True)
-        # Try the environment next
+        # self.args gets highest precedence.  There's nothing to do for
+        # that apart from not overwriting it.
+        # Environment comes next
         self.args['key_id'] = (self.args.get('key_id') or
                                os.getenv('AWS_ACCESS_KEY_ID') or
                                os.getenv('AWS_ACCESS_KEY'))
@@ -75,8 +74,12 @@ class HmacKeyAuth(BaseAuth):
             os.getenv('AWS_CREDENTIAL_EXPIRATION'))
         # See if an AWS credential file was given in the environment
         self.configure_from_aws_credential_file()
-        # Try the requestbuilder config file next
-        self.configure_from_configfile()
+        # Try the config file
+        self.args['key_id'] = (self.args.get('key_id') or
+                               self.config.get_user_option('key-id'))
+        self.args['secret_key'] = (self.args.get('secret_key') or
+                                   self.config.get_user_option('secret-key',
+                                                               redact=True))
 
         if not self.args.get('key_id'):
             raise AuthError('missing access key ID; please supply one with -I')
@@ -117,20 +120,6 @@ class HmacKeyAuth(BaseAuth):
                         elif (key.strip() == 'AWSSecretKey' and
                               not self.args.get('secret_key')):
                             self.args['secret_key'] = val.strip()
-
-    def configure_from_configfile(self, only_if_explicit=False):
-        if only_if_explicit and not self.args.get('region'):  # Somewhat hacky
-            # The current user/region were not explicitly set, so do nothing.
-            return
-        if not self.args.get('key_id'):
-            config_key_id = self.config.get_user_option('key-id')
-            if config_key_id:
-                self.args['key_id'] = config_key_id
-        if not self.args.get('secret_key'):
-            config_secret_key = self.config.get_user_option('secret-key',
-                                                            redact=True)
-            if config_secret_key:
-                self.args['secret_key'] = config_secret_key
 
 
 class HmacV1Auth(HmacKeyAuth):
