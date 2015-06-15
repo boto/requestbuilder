@@ -14,9 +14,11 @@
 
 from __future__ import absolute_import
 
+import cgi
 import collections
 import datetime
 import functools
+import io
 import logging
 import os.path
 import random
@@ -254,7 +256,20 @@ class BaseService(RegionConfigurableMixin):
                     val = '<redacted>'
                 self.log.debug('request param:  %s: %s', key, val)
         if isinstance(request.data, (dict, collections.Mapping)):
-            for key, val in sorted(urlparse.parse_qsl(p_request.body)):
+            content_type, content_type_params = cgi.parse_header(
+                p_request.headers.get('content-type') or '')
+            if content_type == 'multipart/form-data':
+                data = cgi.parse_multipart(io.BytesIO(p_request.body),
+                                           content_type_params)
+            elif content_type == 'application/x-www-form-urlencoded':
+                data = dict(urlparse.parse_qsl(p_request.body))
+            else:
+                data = request.data
+            for key, val in sorted(data.items()):
+                if key in (request.files or {}):
+                    # We probably don't want to include the contents of
+                    # entire files in debug output.
+                    continue
                 if key.lower().endswith('password'):
                     val = '<redacted>'
                 self.log.debug('request data:   %s: %s', key, val)
