@@ -205,15 +205,25 @@ class BaseService(RegionConfigurableMixin):
                 return response
         except requests.exceptions.ConnectionError as exc:
             self.log.debug('connection error', exc_info=True)
-            if len(exc.args) > 0 and hasattr(exc.args[0], 'reason'):
-                raise ClientError(exc.args[0].reason)
-            else:
-                raise ClientError('connection error')
+            return self.__handle_connection_error(exc)
         except requests.exceptions.HTTPError as exc:
             return self.handle_http_error(response)
         except requests.exceptions.RequestException as exc:
             self.log.debug('request error', exc_info=True)
             raise ClientError(exc)
+
+    def __handle_connection_error(self, err):
+        if isinstance(err, six.string_types):
+            msg = err
+        elif isinstance(err, Exception) and len(err.args) > 0:
+            if hasattr(err.args[0], 'reason'):
+                msg = err.args[0].reason
+            elif isinstance(err.args[0], Exception):
+                return self.__handle_connection_error(err.args[0])
+            msg = err.args[0]
+        else:
+            raise ClientError('connection error')
+        raise ClientError('connection error ({0})'.format(msg))
 
     def handle_http_error(self, response):
         self.log.debug('HTTP error', exc_info=True)
