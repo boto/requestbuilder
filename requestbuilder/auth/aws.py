@@ -110,6 +110,14 @@ class HmacKeyAuth(BaseAuth):
         """
 
         # self.args gets highest precedence
+        if self.args.get('key_id') and not self.args.get('secret_key'):
+            # __reset_unless_ready will wipe out key_id and result in
+            # the wrong error message
+            raise AuthError('missing secret key; please supply one with -S')
+        if self.args.get('secret_key') and not self.args.get('key_id'):
+            # If only one is supplied at the command line we should
+            # immediately blow up
+            raise AuthError('missing access key ID; please supply one with -I')
         if self.__reset_unless_ready():
             self.log.debug('using auth info provided directly')
             return
