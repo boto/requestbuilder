@@ -13,7 +13,6 @@
 # OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 import requestbuilder
-import warnings
 
 
 def add_default_routes(arglike_obj, default_routes):

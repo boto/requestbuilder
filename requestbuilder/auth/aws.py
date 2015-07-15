@@ -22,6 +22,7 @@ import hashlib
 import hmac
 import os
 import re
+import tempfile
 import time
 import warnings
 
@@ -76,8 +77,8 @@ class HmacKeyAuth(BaseAuth):
             else:
                 self.log.warn(
                     'failed to parse credential expiration time '
-                    '\'{0}\'; proceeding without validation'.format(
-                    self.args['credential_expiration']))
+                    '\'{0}\'; proceeding without validation'
+                    .format(self.args['credential_expiration']))
             if expiration and expiration < datetime.datetime.utcnow():
                 raise AuthError('credentials have expired')
 

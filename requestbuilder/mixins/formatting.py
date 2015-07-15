@@ -12,7 +12,6 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
 # OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-import argparse
 import operator
 import sys
 
@@ -34,15 +33,12 @@ class TabifyingMixin(object):
                 help='show empty values as "(nil)"')]
 
     def tabify(self, fields, include=None):
-        '''
+        """
         Join a list of strings with tabs.  Nonzero items that Python considers
         false are printed as-is if they appear in the include list, replaced
         with '(nil)' if the user specifies --show-empty-fields at the command
         line, and omitted otherwise.
-        '''
-        def allowable(item):
-            return bool(item) or item is 0 or item in (include or [])
-
+        """
         if self.args['show_empty_fields']:
             fstr = '(nil)'
         else:
@@ -97,8 +93,8 @@ else:
         def add_row(self, row):
             if len(row) != len(self.field_names):
                 raise ValueError('row has incorrect number of values '
-                                '({0} given, {1} expected)'
-                                .format(len(row), len(field_names)))
+                                 '({0} given, {1} expected)'
+                                 .format(len(row), len(self.field_names)))
             self._rows.append(_filter_row_values(row, self.__empty))
 
         @property
