@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2014, Eucalyptus Systems, Inc.
+# Copyright (c) 2012-2015, Eucalyptus Systems, Inc.
 #
 # Permission to use, copy, modify, and/or distribute this software for
 # any purpose with or without fee is hereby granted, provided that the
@@ -14,8 +14,6 @@
 
 import argparse
 import math
-import operator
-import os
 import signal
 import sys
 import time
@@ -24,185 +22,8 @@ try:
     import progressbar
 except ImportError:
     pass
-try:
-    import prettytable
-except ImportError:
-    pass
 
 from requestbuilder import Arg, MutuallyExclusiveArgList
-
-
-class RegionConfigurableMixin(object):
-    """
-    A mixin that allows the user to specify which user/region names to use
-    for the configuration via a --region arg and, if a 'REGION_ENVVAR' class
-    variable is set, an environment variable as well.  The included
-    update_config_view method actually reads these data and updates
-    self.config to point to them.
-    """
-
-    ARGS = [Arg('--region', metavar='USER@REGION', route_to=None,
-                help=('region and/or user names to search when looking up '
-                      'config file data'))]
-
-    def update_config_view(self, region=None, user=None):
-        # Different sources of user/region info can override only parts of
-        # the set, so we only overwite things conditionally.
-
-        # self.args gets highest precedence
-        if self.args.get('region'):
-            _user, _region = self.__parse_region(self.args['region'])
-            user = user or _user
-            region = region or _region
-        # Environment comes next
-        if (getattr(self, 'REGION_ENVVAR', None) and
-                os.getenv(self.REGION_ENVVAR)):
-            _user, _region = self.__parse_region(os.getenv(self.REGION_ENVVAR))
-            user = user or _user
-            region = region or _region
-        # Default region from the config file
-        if not region:
-            region = self.config.get_global_option('default-region')
-        # User info can come from a region, so set that in the config now.
-        if region:
-            self.config.region = region
-        # Look up the region's user if needed...
-        if not user:
-            user = self.config.get_region_option('user')
-        # ...and finally update the config with that as well.
-        if user:
-            self.config.user = user
-
-    @staticmethod
-    def __parse_region(regionish):
-        """
-        Given a string with pattern "[USER@][REGION]", return the user
-        and region names that that string represents, if any, and None
-        for the values it does not represent.
-
-        Examples:
-         - ""          -> (None, None)
-         - "spam"      -> (None, "spam")
-         - "eggs@"     -> ("eggs", None)
-         - "eggs@spam" -> ("eggs", "spam")
-        """
-
-        if not regionish:
-            return None, None
-        if regionish.endswith('@'):
-            return regionish.rstrip('@'), None
-        elif '@' in regionish:
-            return regionish.split('@', 1)
-        else:
-            return None, regionish
-
-
-class TabifyingMixin(object):
-    '''
-    A command mixin that provides the tabify() function along with its
-    associated --show-empty-fields command line arg.
-    '''
-
-    ARGS = [Arg('--show-empty-fields', action='store_true', route_to=None,
-                help='show empty values as "(nil)"')]
-
-    def tabify(self, fields, include=None):
-        '''
-        Join a list of strings with tabs.  Nonzero items that Python considers
-        false are printed as-is if they appear in the include list, replaced
-        with '(nil)' if the user specifies --show-empty-fields at the command
-        line, and omitted otherwise.
-        '''
-        def allowable(item):
-            return bool(item) or item is 0 or item in (include or [])
-
-        if self.args['show_empty_fields']:
-            fstr = '(nil)'
-        else:
-            fstr = ''
-        return '\t'.join(_filter_row_values(fields, fstr, include=include))
-
-
-class TableOutputMixin(object):
-    ARGS = [Arg('--show-headers', action='store_true', route_to=None,
-                help='show column headers'),
-            Arg('--show-empty-fields', action='store_true', route_to=None,
-                help='show empty field values as "(nil)"')]
-
-    def get_table(self, field_names):
-        table = _FilteredTable(field_names=field_names,
-                               show_empty=self.args.get('show_empty_fields'))
-        table.border = False
-        table.header = self.args.get('show_headers') or False
-        table.header_style = 'upper'
-        table.align = 'l'  # left
-        table.left_padding_width = 0
-        table.right_padding_width = 2
-        return table
-
-
-if 'prettytable' in sys.modules:
-    class _FilteredTable(prettytable.PrettyTable):
-        def __init__(self, show_empty=False, **kwargs):
-            if show_empty:
-                self.__empty = '(nil)'
-            else:
-                self.__empty = ''
-            prettytable.PrettyTable.__init__(self, **kwargs)
-
-        def add_row(self, row):
-            prettytable.PrettyTable.add_row(
-                self, _filter_row_values(row, self.__empty))
-else:
-    # UglyTable
-    class _FilteredTable(object):
-        def __init__(self, field_names, show_empty=False):
-            self.field_names = field_names
-            self.header = False
-            self.reversesort = False
-            self._rows = []
-            self._sortindex = 0
-            if show_empty:
-                self.__empty = '(nil)'
-            else:
-                self.__empty = ''
-
-        def add_row(self, row):
-            if len(row) != len(self.field_names):
-                raise ValueError('row has incorrect number of values '
-                                '({0} given, {1} expected)'
-                                .format(len(row), len(field_names)))
-            self._rows.append(_filter_row_values(row, self.__empty))
-
-        @property
-        def sortby(self):
-            return self.field_names[self._sortindex]
-
-        @sortby.setter
-        def sortby(self, field):
-            self._sortindex = self.field_names.index(field)
-
-        def get_string(self):
-            lines = []
-            if self.header:
-                lines.append('\t'.join(name.upper() for name in self.field_names))
-            for row in sorted(self._rows, reverse=self.reversesort,
-                              key=operator.itemgetter(self._sortindex)):
-                lines.append('\t'.join(map(str, row)))
-            return '\n'.join(lines)
-
-        def __str__(self):
-            return self.get_string()
-
-
-def _filter_row_values(row, empty_str, include=None):
-    filtered = []
-    for field in row:
-        if field or field is 0 or field in (include or []):
-            filtered.append(field)
-        else:
-            filtered.append(empty_str)
-    return filtered
 
 
 if 'progressbar' in sys.modules:
@@ -345,7 +166,7 @@ class _MachineReadableCounter(object):
             self.__template = ''
         if self.maxval:
             self.__template = '{0}{{0}}/{1}'.format(self.__template,
-                                                    int(self.maxval))
+                                                      int(self.maxval))
         else:
             self.__template = '{0}{{0}}'.format(self.__template)
 
