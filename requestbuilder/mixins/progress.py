@@ -165,10 +165,10 @@ class _MachineReadableCounter(object):
         else:
             self.__template = ''
         if self.maxval:
-            self.__template = '{0}{{0}}/{1}'.format(self.__template,
+            self.__template = '{0}{{0}}/{1}\n'.format(self.__template,
                                                       int(self.maxval))
         else:
-            self.__template = '{0}{{0}}'.format(self.__template)
+            self.__template = '{0}{{0}}\n'.format(self.__template)
 
     def start(self):
         self._display()
