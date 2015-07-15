@@ -17,6 +17,7 @@ import math
 import os
 import signal
 import sys
+import time
 
 try:
     import progressbar
@@ -125,17 +126,19 @@ if 'progressbar' in sys.modules:
                 help='show progress (the default when run interactively)'),
             Arg('--no-progress', dest='show_progress', action='store_false',
                 default=sys.stdout.isatty(), route_to=None, help='''do not
-                show progress (the default when run non-interactively)'''))]
+                show progress (the default when run non-interactively)'''),
+            Arg('--porcelain', dest='show_porcelain', action='store_true',
+                route_to=None, help='show machine-readable progress'))]
 else:
     # Keep them around so scripts don't break, but make them non-functional
-    #
-    # This isn't in a MutuallyExclusiveArgList because of an argparse bug:
-    # http://bugs.python.org/issue17890
     _PROGRESS_BAR_COMMAND_ARGS = [
-        Arg('--progress', dest='show_progress', action='store_false',
-            default=False, route_to=None, help=argparse.SUPPRESS),
-        Arg('--no-progress', dest='show_progress', action='store_false',
-            default=False, route_to=None, help=argparse.SUPPRESS)]
+        MutuallyExclusiveArgList(
+            Arg('--progress', dest='show_progress', action='store_false',
+                default=False, route_to=None, help=argparse.SUPPRESS),
+            Arg('--no-progress', dest='show_progress', action='store_false',
+                default=False, route_to=None, help=argparse.SUPPRESS),
+            Arg('--porcelain', dest='show_porcelain', action='store_true',
+                route_to=None, help='show machine-readable progress'))]
 
 
 class FileTransferProgressBarMixin(object):
@@ -150,8 +153,10 @@ class FileTransferProgressBarMixin(object):
     ARGS = _PROGRESS_BAR_COMMAND_ARGS
 
     def get_progressbar(self, label=None, maxval=None):
-        if 'progressbar' in sys.modules and self.args.get('show_progress',
-                                                          False):
+        if self.args.get('show_porcelain'):
+            return _MachineReadableCounter(label=label, maxval=maxval)
+        elif 'progressbar' in sys.modules and self.args.get('show_progress',
+                                                            False):
             widgets = []
             if label is not None:
                 widgets += [label, ' ']
@@ -238,3 +243,41 @@ if 'progressbar' in sys.modules:
                 power = int(math.log(pbar.currval, 1024))
                 scaledval = pbar.currval / 1024.0 ** power
             return '{0:6.2f} {1}B'.format(scaledval, self.PREFIXES[power])
+
+
+class _MachineReadableCounter(object):
+    def __init__(self, maxval=None, label=None):
+        self.maxval = maxval
+        self.currval = 0
+        self._last_displayed_val = None
+        self._last_updated = 0
+        self._finished = False
+        if label:
+            self.__template = '{0} '.format(label)
+        else:
+            self.__template = ''
+        if self.maxval:
+            self.__template = '{0}{{0}}/{1}'.format(self.__template,
+                                                    int(self.maxval))
+        else:
+            self.__template = '{0}{{0}}'.format(self.__template)
+
+    def start(self):
+        self._display()
+
+    def update(self, val):
+        self.currval = val
+        delta = time.time() - self._last_updated
+        if (delta > 0.1 and self.currval != self._last_displayed_val and
+                not self._finished):
+            self._display()
+            self._last_updated = time.time()
+
+    def finish(self):
+        self.currval = self.maxval
+        self._display()
+        self._finished = True
+
+    def _display(self):
+        sys.stderr.write(self.__template.format(int(self.currval)))
+        self._last_displayed_val = self.currval
