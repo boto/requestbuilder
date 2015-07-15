@@ -182,7 +182,8 @@ class _MachineReadableCounter(object):
             self._last_updated = time.time()
 
     def finish(self):
-        self.currval = self.maxval
+        if self.maxval:
+            self.currval = self.maxval
         self._display()
         self._finished = True
 
