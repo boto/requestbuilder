@@ -23,8 +23,8 @@ class ProgressiveStreamHandler(logging.StreamHandler):
     messages
     '''
 
-    def __init__(self, stream=None):
-        logging.StreamHandler.__init__(self, stream=stream)
+    def __init__(self, **kwargs):
+        logging.StreamHandler.__init__(self, **kwargs)
         self.appending = False
 
     def emit(self, record):
