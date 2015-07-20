@@ -187,7 +187,7 @@ class HmacV1Auth(HmacKeyAuth):
     def apply_to_request_params(self, req, service, expiration_datetime):
         # This does not implement security tokens.
         msg = ('S3RestAuth.apply_to_request_params is deprecated; use '
-               'S3QueryAuth instead')
+               'requestbuilder.auth.aws.QueryHmacV1Auth instead')
         self.log.warn(msg)
         warnings.warn(msg, DeprecationWarning)
 

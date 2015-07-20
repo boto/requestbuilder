@@ -43,7 +43,8 @@ class TabifyingMixin(object):
             fstr = '(nil)'
         else:
             fstr = ''
-        return '\t'.join(_filter_row_values(fields, fstr, include=include))
+        return '\t'.join(str(s) for s in
+                         _filter_row_values(fields, fstr, include=include))
 
 
 class TableOutputMixin(object):
