@@ -34,6 +34,13 @@ class AuthError(ClientError):
     pass
 
 
+class TimeoutError(ClientError):
+    """
+    A request or response timeout
+    """
+    pass
+
+
 class ServiceInitError(ClientError):
     '''
     Failure to set up a service

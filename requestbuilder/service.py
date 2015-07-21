@@ -30,7 +30,7 @@ import six
 import six.moves.urllib_parse as urlparse
 
 from requestbuilder.exceptions import (ClientError, ServerError,
-                                       ServiceInitError)
+                                       ServiceInitError, TimeoutError)
 from requestbuilder.mixins import RegionConfigurableMixin
 
 
@@ -172,8 +172,24 @@ class BaseService(RegionConfigurableMixin):
                     p_request = self.__log_and_prepare_request(
                         method, url, params, data, files, headers, auth)
                     p_request.start_time = datetime.datetime.now()
-                    response = self.session.send(p_request, stream=True,
-                                                 timeout=self.timeout)
+                    try:
+                        response = self.session.send(p_request, stream=True,
+                                                     timeout=self.timeout)
+                    except requests.exceptions.Timeout:
+                        if attempt_no < max_tries:
+                            self.log.debug('timeout', exc_info=True)
+                            if data_file_offset is not None:
+                                self.log.debug('re-seeking body to '
+                                               'beginning of file')
+                                # pylint: disable=E1101
+                                data.seek(data_file_offset)
+                                # pylint: enable=E1101
+                                continue
+                            elif not hasattr(data, 'tell'):
+                                continue
+                            # Fallthrough -- if it has a file pointer but not
+                            # seek we can't retry because we can't rewind.
+                        raise
                     if response.status_code not in (500, 503):
                         break
                     # If it *was* in that list, retry
@@ -206,6 +222,9 @@ class BaseService(RegionConfigurableMixin):
                     # redirect another way for some reason.
                     self.handle_http_error(response)
                 return response
+        except requests.exceptions.Timeout as exc:
+            self.log.debug('timeout', exc_info=True)
+            raise TimeoutError('request timed out', exc)
         except requests.exceptions.ConnectionError as exc:
             self.log.debug('connection error', exc_info=True)
             return self.__handle_connection_error(exc)
