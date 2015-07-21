@@ -108,6 +108,9 @@ class BaseService(RegionConfigurableMixin):
             self._session = requests.session()
             for key, val in self.session_args.iteritems():
                 setattr(self._session, key, val)
+            for adapter in self._session.adapters.values():
+                # send_request handles retries to allow for re-signing
+                adapter.max_retries = 0
         return self._session
 
     def validate_config(self):
