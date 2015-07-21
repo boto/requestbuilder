@@ -242,7 +242,8 @@ class BaseService(RegionConfigurableMixin):
                 msg = err.args[0].reason
             elif isinstance(err.args[0], Exception):
                 return self.__handle_connection_error(err.args[0])
-            msg = err.args[0]
+            else:
+                msg = err.args[0]
         else:
             raise ClientError('connection error')
         raise ClientError('connection error ({0})'.format(msg))
