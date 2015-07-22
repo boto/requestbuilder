@@ -173,8 +173,11 @@ class BaseService(RegionConfigurableMixin):
                         method, url, params, data, files, headers, auth)
                     p_request.start_time = datetime.datetime.now()
                     try:
-                        response = self.session.send(p_request, stream=True,
-                                                     timeout=self.timeout)
+                        # verify= works around a bug in requests < 1.2.
+                        # See requests commit 325ea7b.
+                        response = self.session.send(
+                            p_request, stream=True, timeout=self.timeout,
+                            verify=self.session_args['verify'])
                     except requests.exceptions.Timeout:
                         if attempt_no < max_tries:
                             self.log.debug('timeout', exc_info=True)
