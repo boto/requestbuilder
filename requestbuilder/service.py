@@ -30,7 +30,7 @@ import six
 import six.moves.urllib_parse as urlparse
 
 from requestbuilder.exceptions import (ClientError, ServerError,
-                                       ServiceInitError)
+                                       ServiceInitError, TimeoutError)
 from requestbuilder.mixins import RegionConfigurableMixin
 
 
@@ -108,6 +108,9 @@ class BaseService(RegionConfigurableMixin):
             self._session = requests.session()
             for key, val in self.session_args.iteritems():
                 setattr(self._session, key, val)
+            for adapter in self._session.adapters.values():
+                # send_request handles retries to allow for re-signing
+                adapter.max_retries = 0
         return self._session
 
     def validate_config(self):
@@ -169,8 +172,27 @@ class BaseService(RegionConfigurableMixin):
                     p_request = self.__log_and_prepare_request(
                         method, url, params, data, files, headers, auth)
                     p_request.start_time = datetime.datetime.now()
-                    response = self.session.send(p_request, stream=True,
-                                                 timeout=self.timeout)
+                    try:
+                        # verify= works around a bug in requests < 1.2.
+                        # See requests commit 325ea7b.
+                        response = self.session.send(
+                            p_request, stream=True, timeout=self.timeout,
+                            verify=self.session_args['verify'])
+                    except requests.exceptions.Timeout:
+                        if attempt_no < max_tries:
+                            self.log.debug('timeout', exc_info=True)
+                            if data_file_offset is not None:
+                                self.log.debug('re-seeking body to '
+                                               'beginning of file')
+                                # pylint: disable=E1101
+                                data.seek(data_file_offset)
+                                # pylint: enable=E1101
+                                continue
+                            elif not hasattr(data, 'tell'):
+                                continue
+                            # Fallthrough -- if it has a file pointer but not
+                            # seek we can't retry because we can't rewind.
+                        raise
                     if response.status_code not in (500, 503):
                         break
                     # If it *was* in that list, retry
@@ -203,6 +225,9 @@ class BaseService(RegionConfigurableMixin):
                     # redirect another way for some reason.
                     self.handle_http_error(response)
                 return response
+        except requests.exceptions.Timeout as exc:
+            self.log.debug('timeout', exc_info=True)
+            raise TimeoutError('request timed out', exc)
         except requests.exceptions.ConnectionError as exc:
             self.log.debug('connection error', exc_info=True)
             return self.__handle_connection_error(exc)
@@ -220,7 +245,8 @@ class BaseService(RegionConfigurableMixin):
                 msg = err.args[0].reason
             elif isinstance(err.args[0], Exception):
                 return self.__handle_connection_error(err.args[0])
-            msg = err.args[0]
+            else:
+                msg = err.args[0]
         else:
             raise ClientError('connection error')
         raise ClientError('connection error ({0})'.format(msg))
