@@ -30,7 +30,7 @@ class RequestBuilder(object):
 
     @staticmethod
     def format_version():
-        return 'requestbuilder {0} (Intermezzo)'.format(__version__)
+        return 'requestbuilder {0} (Allegro)'.format(__version__)
 
     @staticmethod
     def list_config_files():

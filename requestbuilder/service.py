@@ -177,7 +177,8 @@ class BaseService(RegionConfigurableMixin):
                         # See requests commit 325ea7b.
                         response = self.session.send(
                             p_request, stream=True, timeout=self.timeout,
-                            verify=self.session_args['verify'])
+                            verify=self.session_args['verify'],
+                            allow_redirects=False)
                     except requests.exceptions.Timeout:
                         if attempt_no < max_tries:
                             self.log.debug('timeout', exc_info=True)

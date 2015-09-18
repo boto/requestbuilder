@@ -22,7 +22,7 @@ from setuptools import find_packages, setup
 from requestbuilder import __version__
 
 
-requirements = ['requests>=1',
+requirements = ['requests>=2.4',
                 'six']
 if sys.version_info < (2, 7):
     requirements.append('argparse')
