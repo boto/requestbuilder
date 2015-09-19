@@ -92,12 +92,11 @@ class BaseService(RegionConfigurableMixin):
             else:
                 self.timeout = self.TIMEOUT
 
-        # SSL cert verification is opt-in
-        self.session_args['verify'] = self.config.convert_to_bool(
-            self.config.get_region_option('verify-ssl'), default=False)
+        self.session_args.setdefault('stream', True)
 
-        # requests only applies proxy config in code paths we don't use
-        self.session_args['proxies'] = _get_proxies()
+        # SSL cert verification is opt-in
+        self.session_args.setdefault('verify', self.config.convert_to_bool(
+            self.config.get_region_option('verify-ssl'), default=False))
 
         # Ensure everything is okay and finish up
         self.validate_config()
@@ -172,12 +171,12 @@ class BaseService(RegionConfigurableMixin):
                     p_request = self.__log_and_prepare_request(
                         method, url, params, data, files, headers, auth)
                     p_request.start_time = datetime.datetime.now()
+                    proxies = requests.utils.get_environ_proxies(url)
+                    for key, val in sorted(proxies.items()):
+                        self.log.debug('request proxy:  %s=%s', key, val)
                     try:
-                        # verify= works around a bug in requests < 1.2.
-                        # See requests commit 325ea7b.
                         response = self.session.send(
-                            p_request, stream=True, timeout=self.timeout,
-                            verify=self.session_args['verify'],
+                            p_request, timeout=self.timeout, proxies=proxies,
                             allow_redirects=False)
                     except requests.exceptions.Timeout:
                         if attempt_no < max_tries:
@@ -277,7 +276,7 @@ class BaseService(RegionConfigurableMixin):
         request = requests.Request(method=method, url=url, params=params,
                                    data=data, files=files, headers=headers,
                                    auth=bound_auth)
-        p_request = request.prepare()
+        p_request = self.session.prepare_request(request)
         p_request.hooks = {'response': hooks['response']}
         self.log.debug('request method: %s', request.method)
         self.log.debug('request url:    %s', p_request.url)
@@ -374,14 +373,3 @@ def _parse_endpoint_url(urlish):
         region = None
         url = urlish
     return url, region
-
-
-def _get_proxies():
-    try:
-        bypass = six.moves.urllib.request.proxy_bypass()
-    except (TypeError, socket.gaierror):
-        # This blows up on my old OS X machine
-        bypass = False
-    if bypass:
-        return {}
-    return six.moves.urllib.request.getproxies()
