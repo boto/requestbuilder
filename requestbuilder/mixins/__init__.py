@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2015, Eucalyptus Systems, Inc.
+# Copyright (c) 2012-2016 Hewlett Packard Enterprise Development Company LP
 #
 # Permission to use, copy, modify, and/or distribute this software for
 # any purpose with or without fee is hereby granted, provided that the
@@ -13,6 +13,8 @@
 # OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 import os
+
+import six
 
 from requestbuilder import Arg
 
@@ -40,11 +42,19 @@ class RegionConfigurableMixin(object):
             user = user or _user
             region = region or _region
         # Environment comes next
-        if (getattr(self, 'REGION_ENVVAR', None) and
-                os.getenv(self.REGION_ENVVAR)):
-            _user, _region = self.__parse_region(os.getenv(self.REGION_ENVVAR))
-            user = user or _user
-            region = region or _region
+        region_envvar = getattr(self, 'REGION_ENVVAR', None)
+        if isinstance(region_envvar, (list, tuple)):
+            for var in region_envvar:
+                if os.getenv(var):
+                    _user, _region = self.__parse_region(os.getenv(var))
+                    user = user or _user
+                    region = region or _region
+                    break
+        elif isinstance(region_envvar, six.string_types):
+            if os.getenv(region_envvar):
+                _user, _region = self.__parse_region(region_envvar)
+                user = user or _user
+                region = region or _region
         # Default region from the config file
         if not region:
             region = self.config.get_global_option('default-region')
