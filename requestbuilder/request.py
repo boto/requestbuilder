@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2015, Eucalyptus Systems, Inc.
+# Copyright (c) 2012-2016 Hewlett Packard Enterprise Development LP
 #
 # Permission to use, copy, modify, and/or distribute this software for
 # any purpose with or without fee is hereby granted, provided that the
@@ -336,6 +336,8 @@ class AWSQueryRequest(BaseRequest):
                     flattened[prefixed_key] = str(val).lower()
                 elif isinstance(val, file):
                     flattened[prefixed_key] = val.read()
+                elif isinstance(val, float):
+                    flattened[prefixed_key] = str(val)
                 elif val or val is 0:
                     flattened[prefixed_key] = str(val)
                 elif val is EMPTY:
