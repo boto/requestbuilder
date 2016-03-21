@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2015, Eucalyptus Systems, Inc.
+# Copyright (c) 2012-2016 Hewlett Packard Enterprise Development LP
 #
 # Permission to use, copy, modify, and/or distribute this software for
 # any purpose with or without fee is hereby granted, provided that the
@@ -23,8 +23,30 @@ class ConfigView(object):
     def __init__(self, data, region=None, user=None):
         self.log = data.log
         self.__data = data
-        self.region = region
-        self.user = user
+        self.__region = None
+        self.__user = None
+        if region:
+            self.region = region
+        if user:
+            self.user = user
+
+    @property
+    def region(self):
+        return self.__region
+
+    @region.setter
+    def region(self, value):
+        self.__region = value
+        self.log.info('set region to %s', value)
+
+    @property
+    def user(self):
+        return self.__user
+
+    @user.setter
+    def user(self, value):
+        self.__user = value
+        self.log.info('set user to %s', value)
 
     def clone(self, region=None, user=None):
         region = region or self.region
