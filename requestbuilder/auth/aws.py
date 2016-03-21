@@ -476,8 +476,9 @@ class HmacV4Auth(HmacKeyAuth):
         # This doesn't currently support multi-value headers.
         headers = {}
         for key, val in req.headers.iteritems():
-            if key.lower() != 'user-agent':
-                # This lets us generate copypasteable query URLs
+            if key.lower() not in ('connection', 'user-agent'):
+                # Reverse proxies like to rewrite Connection headers.
+                # Ignoring User-Agent lets us generate storable query URLs
                 headers[key.lower().strip()] = val.strip()
         return headers
 
