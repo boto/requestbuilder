@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2015, Eucalyptus Systems, Inc.
+# Copyright (c) 2012-2016 Hewlett Packard Enterprise Development LP
 #
 # Permission to use, copy, modify, and/or distribute this software for
 # any purpose with or without fee is hereby granted, provided that the
@@ -122,8 +122,11 @@ else:
 def _filter_row_values(row, empty_str, include=None):
     filtered = []
     for field in row:
-        if field or field is 0 or field in (include or []):
+        # pylint: disable=superfluous-parens
+        if (field or field is 0 or (isinstance(field, float) and field == 0)
+                or field in (include or [])):
             filtered.append(field)
         else:
             filtered.append(empty_str)
+        # pylint: enable=superfluous-parens
     return filtered
