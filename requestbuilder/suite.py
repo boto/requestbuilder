@@ -1,4 +1,4 @@
-# Copyright (c) 2013-2014, Eucalyptus Systems, Inc.
+# Copyright (c) 2013-2016 Hewlett Packard Enterprise Development LP
 #
 # Permission to use, copy, modify, and/or distribute this software for
 # any purpose with or without fee is hereby granted, provided that the
@@ -21,9 +21,9 @@ from requestbuilder import __version__
 
 
 class RequestBuilder(object):
-    '''
+    """
     A class with attributes and methods that define an entire suite of tools
-    '''
+    """
 
     def __init__(self):
         self.__user_agent = None

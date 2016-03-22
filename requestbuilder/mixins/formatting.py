@@ -109,7 +109,8 @@ else:
         def get_string(self):
             lines = []
             if self.header:
-                lines.append('\t'.join(name.upper() for name in self.field_names))
+                lines.append('\t'.join(name.upper() for name in
+                                       self.field_names))
             for row in sorted(self._rows, reverse=self.reversesort,
                               key=operator.itemgetter(self._sortindex)):
                 lines.append('\t'.join(map(str, row)))

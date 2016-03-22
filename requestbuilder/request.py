@@ -95,7 +95,9 @@ class BaseRequest(BaseCommand):
             self.service = self.SERVICE_CLASS(self.config,
                                               loglevel=self.log.level)
         if self.auth is None and self.AUTH_CLASS is not None:
+            # pylint: disable=not-callable
             self.auth = self.AUTH_CLASS(self.config, loglevel=self.log.level)
+            # pylint: enable=not-callable
         BaseCommand._post_init(self)
 
     @classmethod
@@ -266,11 +268,11 @@ class AWSQueryRequest(BaseRequest):
         self.log.info('parameters: %s', redacted_params)
 
         if self.method.upper() == 'POST':
-            self.log.debug('sending flattened params as form data')
+            self.log.debug('sending flattened parameters as form data')
             self.body = params
             self.params = {}
         else:
-            self.log.debug('sending flattened params as query string')
+            self.log.debug('sending flattened parameters as query string')
             self.params = params
         try:
             return BaseRequest.send(self)

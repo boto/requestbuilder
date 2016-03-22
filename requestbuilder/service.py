@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2015, Eucalyptus Systems, Inc.
+# Copyright (c) 2012-2016 Hewlett Packard Enterprise Development LP
 #
 # Permission to use, copy, modify, and/or distribute this software for
 # any purpose with or without fee is hereby granted, provided that the
@@ -22,7 +22,6 @@ import io
 import logging
 import os.path
 import random
-import socket
 import time
 
 import requests.exceptions
@@ -302,10 +301,12 @@ class BaseService(RegionConfigurableMixin):
             else:
                 data = request.data
             for key, val in sorted(data.items()):
+                # pylint: disable=superfluous-parens
                 if key in (request.files or {}):
                     # We probably don't want to include the contents of
                     # entire files in debug output.
                     continue
+                # pylint: enable=superfluous-parens
                 if key.lower().endswith('password'):
                     val = '<redacted>'
                 self.log.debug('request data:   %s: %s', key, val)
