@@ -379,7 +379,9 @@ class AWSQueryRequest(BaseRequest):
 
         helplines = ['allowed filter names:']
         for filter_obj in self.FILTERS:
-            if filter_obj.help:
+            if filter_obj.help == argparse.SUPPRESS:
+                continue
+            elif filter_obj.help:
                 first, _, rest = filter_obj.help.partition('\n')
                 if rest.startswith(' ') and not first.startswith(' '):
                     # First line is not uniformly indented
