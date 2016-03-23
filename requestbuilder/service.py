@@ -286,7 +286,8 @@ class BaseService(RegionConfigurableMixin):
                 self.log.debug('request header: %s: %s', key, val)
         if isinstance(request.params, (dict, collections.Mapping)):
             for key, val in sorted(urlparse.parse_qsl(
-                    urlparse.urlparse(p_request.url).query)):
+                    urlparse.urlparse(p_request.url).query,
+                    keep_blank_values=True)):
                 if key.lower().endswith('password'):
                     val = '<redacted>'
                 self.log.debug('request param:  %s: %s', key, val)
@@ -297,7 +298,8 @@ class BaseService(RegionConfigurableMixin):
                 data = cgi.parse_multipart(io.BytesIO(p_request.body),
                                            content_type_params)
             elif content_type == 'application/x-www-form-urlencoded':
-                data = dict(urlparse.parse_qsl(p_request.body))
+                data = dict(urlparse.parse_qsl(p_request.body,
+                                               keep_blank_values=True))
             else:
                 data = request.data
             for key, val in sorted(data.items()):
