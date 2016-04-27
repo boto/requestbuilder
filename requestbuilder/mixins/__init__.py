@@ -52,7 +52,7 @@ class RegionConfigurableMixin(object):
                     break
         elif isinstance(region_envvar, six.string_types):
             if os.getenv(region_envvar):
-                _user, _region = self.__parse_region(region_envvar)
+                _user, _region = self.__parse_region(os.getenv(region_envvar))
                 user = user or _user
                 region = region or _region
         # Default region from the config file
