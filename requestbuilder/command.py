@@ -12,7 +12,7 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
 # OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-from __future__ import absolute_import
+from __future__ import absolute_import, print_function
 
 import argparse
 import bdb
@@ -34,6 +34,9 @@ from requestbuilder.exceptions import ArgumentError
 from requestbuilder.logging import configure_root_logger
 from requestbuilder.suite import RequestBuilder
 from requestbuilder.util import add_default_routes, aggregate_subclass_fields
+
+
+import six
 
 
 class BaseCommand(object):
@@ -250,7 +253,7 @@ class BaseCommand(object):
         self.log.debug('parsed arguments: ' + str(cli_args))
 
     def distribute_args(self):
-        for key, val in self.args.iteritems():
+        for key, val in six.iteritems(self.args):
             # If a location to route this to was supplied, put it there, too.
             if key not in self._arg_routes:
                 raise TypeError('got unrecognized arg: "{0}"'.format(key))
@@ -286,12 +289,12 @@ class BaseCommand(object):
                 if getattr(err, 'filename', None):
                     err_bits[-1] += ':'
                     err_bits.append(err.filename)
-                print >> sys.stderr, ' '.join(err_bits)
+                print(' '.join(err_bits), file=sys.stderr)
             else:
                 if len(err.args) > 0 and err.args[0]:
-                    print >> sys.stderr, msg_prefix, err.args[0]
+                    print(msg_prefix, err.args[0], file=sys.stderr)
                 else:
-                    print >> sys.stderr, msg_prefix, str(err)
+                    print(msg_prefix, str(err), file=sys.stderr)
             # Since we don't even have a config file to consult our options for
             # determining when debugging is on are limited to what we got at
             # the command line.
@@ -347,12 +350,12 @@ class BaseCommand(object):
             if getattr(err, 'filename', None):
                 err_bits[-1] += ':'
                 err_bits.append(err.filename)
-            print >> sys.stderr, ' '.join(err_bits)
+            print(' '.join(err_bits), file=sys.stderr)
         else:
             if len(err.args) > 0 and err.args[0]:
-                print >> sys.stderr, msg_prefix, err.args[0]
+                print(msg_prefix, err.args[0], file=sys.stderr)
             else:
-                print >> sys.stderr, msg_prefix, str(err)
+                print(msg_prefix, str(err), file=sys.stderr)
         if self.debug:
             raise
         sys.exit(1)
@@ -394,4 +397,4 @@ def _debugger_usr1_handler(_, frame):
     frame_dict = {'_frame': frame}
     frame_dict.update(frame.f_globals)
     frame_dict.update(frame.f_locals)
-    print >> sys.stderr, ''.join(traceback.format_stack(frame))
+    print(''.join(traceback.format_stack(frame)), file=sys.stderr)
