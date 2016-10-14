@@ -16,6 +16,7 @@ import argparse
 import operator
 import os.path
 import subprocess
+import warnings
 
 
 __version__ = 'devel'
@@ -96,6 +97,10 @@ class MutuallyExclusiveArgList(list):
 
     def __init__(self, *args):
         if len(args) > 0 and isinstance(args[0], bool):
+            # Deprecated in 0.6
+            warnings.warn('positional booleans in MutuallyExclusiveArgLists '
+                          'are deprecated; use .required() instead',
+                          DeprecationWarning)
             self.is_required = args[0]
             list.__init__(self, args[1:])
         else:
