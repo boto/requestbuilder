@@ -37,7 +37,7 @@ from requestbuilder.util import add_default_routes, aggregate_subclass_fields
 
 
 class BaseCommand(object):
-    '''
+    """
     The basis for a command line tool.  To invoke this as a command line tool,
     call the run() method on the class.  Arguments will be parsed from the
     command line.  To invoke this in another context, such as from inside
@@ -52,8 +52,10 @@ class BaseCommand(object):
     to implement them to do what the tool is designed to do.
 
     Important members of this class include:
-     - DESCRIPTION:  a string that describes the tool.  This becomes part of
-                     the command line help string.
+     - DESCRIPTION:  a string that describes the tool, which is re-wrapped and
+                     used as part of the command line help string.  If it is
+                     not supplied, the class's doc string, if any, will be
+                     used instead.
      - USAGE:        a usage message for the command line help string.  If this
                      is None, one will be generated automatically.
      - ARGS:         a list of Arg and/or MutuallyExclusiveArgGroup objects
@@ -61,7 +63,7 @@ class BaseCommand(object):
                      classes needing to add command line arguments should
                      contain their own ARGS lists, which are combined with
                      those of their parent classes.
-    '''
+    """
 
     DESCRIPTION = ''
     USAGE = None
@@ -154,8 +156,9 @@ class BaseCommand(object):
             configure_root_logger()
 
     def _build_parser(self):
+        description = (self.DESCRIPTION or self.__doc__ or '').strip('\n')
         description = '\n\n'.join([textwrap.fill(textwrap.dedent(para))
-                                   for para in self.DESCRIPTION.split('\n\n')])
+                                   for para in description.split('\n\n')])
         parser = argparse.ArgumentParser(
             description=description, usage=self.USAGE, add_help=False,
             formatter_class=argparse.RawDescriptionHelpFormatter)
