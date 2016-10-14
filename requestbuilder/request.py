@@ -138,16 +138,6 @@ class BaseRequest(BaseCommand):
     def name(self):
         return self.NAME or self.__class__.__name__
 
-    @property
-    def status(self):
-        msg = 'BaseRequest.status is deprecated, use response status'
-        self.log.warn(msg)
-        warnings.warn(msg, DeprecationWarning)  # deprecated in 0.3
-        if self.response is not None:
-            return self.response.status
-        else:
-            return None
-
     def send(self):
         if not self.__configured:
             self.log.warn('send() called before configure(); bugs may result')
