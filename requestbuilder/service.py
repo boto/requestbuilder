@@ -72,6 +72,8 @@ class BaseService(RegionConfigurableMixin):
         return new
 
     def configure(self):
+        # TODO:  rename this to setup
+        #
         # Configure user and region before grabbing endpoint info since
         # the latter may depend upon the former
         self.update_config_view()

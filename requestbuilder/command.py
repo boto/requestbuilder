@@ -270,17 +270,8 @@ class BaseCommand(object):
                     route[key] = val
 
     def configure(self):
-        import pprint
-        #pprint.pprint(self._cli_parser.__dict__)
-        #for arg in self._cli_parser.args:
-        for arg in self.ARGS:
-            pprint.pprint(arg.__dict__)
-        # TODO:  Come up with something that can enforce arg constraints based
-        # on the info we can get from self._cli_parser
+        # TODO:  rename this to setup
         pass
-
-    def setup(self):
-        pass  ## TODO
 
     @classmethod
     def run(cls):

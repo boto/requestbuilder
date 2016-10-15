@@ -127,6 +127,7 @@ class BaseRequest(BaseCommand):
             self.auth.args.update(self.args)
 
     def configure(self):
+        # TODO:  rename this to setup
         BaseCommand.configure(self)
         if self.service is not None:
             self.service.configure()
