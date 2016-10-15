@@ -99,13 +99,11 @@ class BaseCommand(object):
         #
         # Derived classes MUST call this method to ensure things stay sane.
         self.__do_cli = _do_cli
-        self._post_init()
-
-    def _post_init(self):
         self._build_parser()
         if self.__do_cli:
             # Distribute CLI args to the various places that need them
             self.process_cli_args()
+        # This will raise an exception if kwargs contains anything unexpected.
         self.distribute_args()
         try:
             self.configure()
@@ -250,7 +248,7 @@ class BaseCommand(object):
                 # This makes it slightly more obvious that this is redacted by
                 # the framework and not just a string by removing quotes.
                 cli_args[key] = redacted
-        self.log.debug('parsed arguments: ' + str(cli_args))
+        self.log.debug('parsed arguments from CLI: %s', str(cli_args))
 
     def distribute_args(self):
         for key, val in self.args.iteritems():
@@ -337,7 +335,7 @@ class BaseCommand(object):
     def handle_cli_exception(self, err):
         msg_prefix = '{0}: error:'.format(os.path.basename(sys.argv[0]))
         if isinstance(err, ArgumentError) and self.__do_cli and not self.debug:
-            # Note that, unlike _post_init, we get to use self.debug instead
+            # Note that, unlike __init__, we get to use self.debug instead
             # of self.__debug
             self._cli_parser.error(str(err))
         if isinstance(err, EnvironmentError):

@@ -32,7 +32,7 @@ from requestbuilder.xmlparse import parse_listdelimited_aws_xml
 
 
 class BaseRequest(BaseCommand):
-    '''
+    """
     The basis for a command line tool that represents a request.  The data for
     this request are stored in a few instance members:
      - method:   the HTTP method to use (e.g. 'GET').  Defaults to self.METHOD.
@@ -60,10 +60,12 @@ class BaseRequest(BaseCommand):
     Important members of this class, in addition to those inherited from
     BaseCommand, include:
      - SERVICE_CLASS:  a class corresponding to the web service in use
-     - NAME:           a string representing the name of this request.  This
-                       defaults to the class's name.
+     - AUTH_CLASS:     a class corresponding to the authentication method
+                       to use, if any
+     - NAME:           a string representing the name of this request.
+                       This defaults to the class's name.
      - METHOD:         the HTTP method to use by default
-    '''
+    """
 
     SERVICE_CLASS = BaseService
     AUTH_CLASS = None
@@ -73,8 +75,6 @@ class BaseRequest(BaseCommand):
     DEFAULT_ROUTES = (PARAMS,)
 
     def __init__(self, service=None, auth=None, **kwargs):
-        self.auth = auth
-        self.service = service
         # Parts of the HTTP request to be sent to the server.
         self.method = self.METHOD
         self.path = None
@@ -87,18 +87,25 @@ class BaseRequest(BaseCommand):
         self.response = None
 
         self.__configured = False
+        self.__auth = auth
+        self.__service = service
 
         BaseCommand.__init__(self, **kwargs)
 
-    def _post_init(self):
-        if self.service is None and self.SERVICE_CLASS is not None:
-            self.service = self.SERVICE_CLASS(self.config,
-                                              loglevel=self.log.level)
-        if self.auth is None and self.AUTH_CLASS is not None:
+    @property
+    def auth(self):
+        if not self.__auth and self.AUTH_CLASS is not None:
             # pylint: disable=not-callable
-            self.auth = self.AUTH_CLASS(self.config, loglevel=self.log.level)
+            self.__auth = self.AUTH_CLASS(self.config, loglevel=self.log.level)
             # pylint: enable=not-callable
-        BaseCommand._post_init(self)
+        return self.__auth
+
+    @property
+    def service(self):
+        if not self.__service and self.SERVICE_CLASS is not None:
+            self.__service = self.SERVICE_CLASS(self.config,
+                                                loglevel=self.log.level)
+        return self.__service
 
     @classmethod
     def from_other(cls, other, **kwargs):
