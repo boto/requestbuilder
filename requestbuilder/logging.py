@@ -17,6 +17,9 @@ from __future__ import absolute_import
 import logging
 
 
+NOTICE = (logging.WARN + logging.INFO) // 2
+
+
 class ProgressiveStreamHandler(logging.StreamHandler):
     '''
     A handler class that allows the "cursor" to stay on one line for selected
@@ -52,7 +55,8 @@ class ProgressiveStreamHandler(logging.StreamHandler):
 class ColoringFormatter(logging.Formatter):
     LOG_COLORS = [(logging.ERROR, '\033[91m'),
                   (logging.WARN, '\033[93m'),
-                  (logging.INFO, '\033[92m'),
+                  (NOTICE, '\033[92m'),
+                  (logging.INFO, '\033[96m'),
                   (logging.DEBUG, '\033[94m')]
 
     def format(self, record):
@@ -63,7 +67,14 @@ class ColoringFormatter(logging.Formatter):
         return msg
 
 
+class RequestbuilderLogger(logging.Logger):
+    def notice(self, msg, *args, **kwargs):
+        self.log(NOTICE, msg, *args, **kwargs)
+
+
 def configure_root_logger(use_color=False):
+    logging.addLevelName(NOTICE, 'NOTICE')
+    logging.setLoggerClass(RequestbuilderLogger)
     logfmt = '%(asctime)s %(levelname)-7s %(name)s %(message)s'
     rootlogger = logging.getLogger('')
     handler = ProgressiveStreamHandler()
