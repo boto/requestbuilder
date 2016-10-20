@@ -18,6 +18,7 @@ import argparse
 import bdb
 import logging
 import os.path
+import re
 import signal
 import sys
 import textwrap
@@ -154,9 +155,8 @@ class BaseCommand(object):
             configure_root_logger()
 
     def _build_parser(self):
-        description = (self.DESCRIPTION or self.__doc__ or '').strip('\n')
-        description = '\n\n'.join([textwrap.fill(textwrap.dedent(para))
-                                   for para in description.split('\n\n')])
+        description = _rewrap_description(
+            self.DESCRIPTION or self.__doc__ or '')
         parser = argparse.ArgumentParser(
             description=description, usage=self.USAGE, add_help=False,
             formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -395,3 +395,90 @@ def _debugger_usr1_handler(_, frame):
     frame_dict.update(frame.f_globals)
     frame_dict.update(frame.f_locals)
     print >> sys.stderr, ''.join(traceback.format_stack(frame))
+
+
+def _rewrap_description(text, width=70):
+    """
+    Split lines into paragraphs based on blank lines and changes in
+    indentation level, rewrap the text in each of those paragraphs, and
+    yield each of those paragraphs.  In paragraphs that start with
+    common shell prompt characters (#, $, and %) or bullets (* and -)
+    followed by whitespace, those characters do not count against the
+    paragraph's indentation level.
+    """
+    # Match shell prompts and bullets
+    bullets = {r'^(\s*)\#(\s+)': r'\1 \2',
+               r'^(\s*)\$(\s+)': r'\1 \2',
+               r'^(\s*)\%(\s+)': r'\1 \2',
+               r'^(\s*)\*(\s+)': r'\1 \2',
+               r'^(\s*)\-(\s+)': r'\1 \2'}
+
+    def measure_margin(line):
+        if not line.strip():
+            return -1
+        for pattern, sub in bullets.iteritems():
+            line = re.sub(pattern, sub, line)
+        return len(line) - len(line.lstrip())
+
+    def find_bullet_pattern(line):
+        for pattern in bullets:
+            if line and re.match(pattern, line):
+                return pattern
+
+    def reformat_paragraph(lines, width=70):
+        if not lines:
+            return ''
+        margin = measure_margin(lines[0])
+        pattern = find_bullet_pattern(lines[0])
+        if pattern:
+            firstline_margin = len(lines[0]) - len(lines[0].lstrip())
+            bullet_text = lines[0][firstline_margin:margin]
+            lines[0] = re.sub(pattern, bullets[pattern], lines[0], 1)
+        rewrapped = textwrap.wrap('\n'.join(line.strip() for line in lines),
+                                  width=(width - margin))
+        if pattern:
+            combined = ([' ' * firstline_margin + bullet_text + rewrapped[0]] +
+                        [' ' * margin + line for line in rewrapped[1:]])
+        else:
+            combined = [' ' * margin + line for line in rewrapped]
+
+        combined = '\n'.join(' ' * margin + line for line in rewrapped)
+        if pattern:
+            combined = ' ' * firstline_margin + bullet_text + combined[margin:]
+        return combined
+
+    text %= dict(prog=os.path.basename(sys.argv[0]))
+    in_lines = textwrap.dedent(text.rstrip().lstrip('\n')).splitlines()
+    paragraphs = []
+    current_lines = []
+    current_margin = 0
+    for line in in_lines:
+        if not line.strip():
+            paragraphs.append(reformat_paragraph(current_lines,
+                                                 width=width))
+            del current_lines[:]
+            current_lines.append('')
+            current_margin = -1
+        else:
+            pattern = find_bullet_pattern(line)
+            margin = measure_margin(line)
+            if pattern:
+                # Bullets always begin new paragraphs
+                paragraphs.append(reformat_paragraph(current_lines,
+                                                     width=width))
+                del current_lines[:]
+            elif margin != current_margin:
+                # Different margin -> start new paragraph
+                paragraphs.append(reformat_paragraph(current_lines,
+                                                     width=width))
+                del current_lines[:]
+            current_margin = margin
+            current_lines.append(line)
+    if current_lines:
+        paragraphs.append(reformat_paragraph(current_lines, width=width))
+
+    # Combine adjacent empty paragraphs
+    for i in xrange(len(paragraphs) - 1, 0, -1):
+        if paragraphs[i] == paragraphs[i - 1] == '':
+            del paragraphs[i]
+    return '\n'.join(paragraphs)
