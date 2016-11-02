@@ -71,7 +71,7 @@ class BaseCommand(object):
     ARGS = []
     DEFAULT_ROUTES = ()
     SUITE = RequestBuilder
-    __CONFIGURED_FROM_CLI = False
+    __CONFIGURED_GLOBAL_STATE = False
 
     def __init__(self, config=None, loglevel=None, _do_cli=False, **kwargs):
         self.args = kwargs
@@ -81,16 +81,13 @@ class BaseCommand(object):
         self._arg_routes = {}  # arg name -> tuple of callables or dicts
         self._cli_parser = None  # created by _build_parser
         self.__debug = False
+        self.__do_cli = _do_cli
 
         self._configure_logging(loglevel)
         self._process_configfiles()
-        if _do_cli:
-            if BaseCommand.__CONFIGURED_FROM_CLI:
-                self.log.warn('global state being configured a second time; '
-                              'bugs may result (usual cause is calling run() '
-                              'for chained commands instead of main())')
+        if self.__do_cli and not BaseCommand.__CONFIGURED_GLOBAL_STATE:
             self._configure_global_logging()
-            BaseCommand.__CONFIGURED_FROM_CLI = True
+            BaseCommand.__CONFIGURED_GLOBAL_STATE = True
 
         # We need to enforce arg constraints in one location to make this
         # framework equally useful for chained commands and those driven
@@ -99,7 +96,6 @@ class BaseCommand(object):
         # off until we hit CLI-specific code.
         #
         # Derived classes MUST call this method to ensure things stay sane.
-        self.__do_cli = _do_cli
         self._build_parser()
         if self.__do_cli:
             # Distribute CLI args to the various places that need them
