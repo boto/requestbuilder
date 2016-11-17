@@ -33,39 +33,53 @@ class RegionConfigurableMixin(object):
                       'config file data'))]
 
     def update_config_view(self, region=None, user=None):
-        # Different sources of user/region info can override only parts of
-        # the set, so we only overwite things conditionally.
+        # If the caller specified something directly we overwrite
+        # whatever may be there unconditionally.
+        if region:
+            self.config.region = region
+        if user:
+            self.config.user = user
+
+        # Otherwise, different sources of user/region info can override
+        # only one of the pair, so we only overwite them individually,
+        # and then only when no values are already set.
 
         # self.args gets highest precedence
         if self.args.get('region'):
-            _user, _region = self.__parse_region(self.args['region'])
-            user = user or _user
-            region = region or _region
+            self.__setdefault_view_attrs(
+                '--region CLI option "{0}"'.format(self.args['region']),
+                *self.__parse_region(self.args['region']))
         # Environment comes next
         region_envvar = getattr(self, 'REGION_ENVVAR', None)
         if isinstance(region_envvar, (list, tuple)):
             for var in region_envvar:
                 if os.getenv(var):
-                    _user, _region = self.__parse_region(os.getenv(var))
-                    user = user or _user
-                    region = region or _region
+                    self.__setdefault_view_attrs(
+                        'environment variable "{0}"'.format(var),
+                        *self.__parse_region(os.getenv(var)))
                     break
         elif isinstance(region_envvar, six.string_types):
             if os.getenv(region_envvar):
-                _user, _region = self.__parse_region(os.getenv(region_envvar))
-                user = user or _user
-                region = region or _region
+                self.__setdefault_view_attrs(
+                    'environment variable "{0}"'.format(region_envvar),
+                    *self.__parse_region(os.getenv(region_envvar)))
         # Default region from the config file
-        if not region:
-            region = self.config.get_global_option('default-region')
-        # User info can come from a region, so set that in the config now.
-        if region:
+        self.__setdefault_view_attrs(
+            '"default-region" global config option',
+            region=self.config.get_global_option('default-region'))
+        # We've gone through all possible means of region selection, so
+        # if no user is yet selected look it up in the region's config.
+        user, section = self.config.get_region_option2('user')
+        self.__setdefault_view_attrs(
+            '"user" config option for region "{0}"'.format(section),
+            user=user)
+
+    def __setdefault_view_attrs(self, cause, user=None, region=None):
+        if region and not self.config.region:
+            self.log.info('selected region "%s" from %s', region, cause)
             self.config.region = region
-        # Look up the region's user if needed...
-        if not user:
-            user = self.config.get_region_option('user')
-        # ...and finally update the config with that as well.
-        if user:
+        if user and not self.config.user:
+            self.log.info('selected user "%s" from %s', user, cause)
             self.config.user = user
 
     @staticmethod
