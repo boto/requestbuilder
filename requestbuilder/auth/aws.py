@@ -269,7 +269,6 @@ class HmacV1Auth(HmacKeyAuth):
                     if val is None:
                         subresources.append(key)
                     else:
-                        print '{0}={1}'.format(key, val), key + '=' + val
                         subresources.append(key + '=' + val)
                 if subresources:
                     resource += '?' + '&'.join(subresources)
