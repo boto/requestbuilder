@@ -106,7 +106,7 @@ class BaseService(RegionConfigurableMixin):
     def session(self):
         if self._session is None:
             self._session = requests.session()
-            for key, val in self.session_args.iteritems():
+            for key, val in six.iteritems(self.session_args):
                 setattr(self._session, key, val)
             for adapter in self._session.adapters.values():
                 # send_request handles retries to allow for re-signing
@@ -282,7 +282,7 @@ class BaseService(RegionConfigurableMixin):
         self.log.debug('request  method: %s', request.method)
         self.log.debug('request  url:    %s', p_request.url)
         if isinstance(p_request.headers, (dict, collections.Mapping)):
-            for key, val in sorted(p_request.headers.iteritems()):
+            for key, val in sorted(six.iteritems(p_request.headers)):
                 if key.lower().endswith('password'):
                     val = '<redacted>'
                 self.log.debug('request  header: %s: %s', key, val)
@@ -315,7 +315,7 @@ class BaseService(RegionConfigurableMixin):
                     val = '<redacted>'
                 self.log.debug('request  data:   %s: %s', key, val)
         if isinstance(request.files, (dict, collections.Mapping)):
-            for key, val in sorted(request.files.iteritems()):
+            for key, val in sorted(six.iteritems(request.files)):
                 if hasattr(val, '__len__'):
                     val = '<{0} bytes>'.format(len(val))
                 self.log.debug('request  file:   %s: %s', key, val)

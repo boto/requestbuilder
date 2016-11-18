@@ -14,9 +14,12 @@
 
 from __future__ import absolute_import
 
-import ConfigParser
 import itertools
 import logging
+
+
+import six
+from six.moves import configparser
 
 
 class ConfigView(object):
@@ -87,7 +90,7 @@ class ConfigView(object):
     @staticmethod
     def __get_all_options(confdict, option):
         matches = {}
-        for section, options in confdict.iteritems():
+        for section, options in six.iteritems(confdict):
             if '*' not in section and option in options:
                 matches[section] = options[option]
         return matches
@@ -115,7 +118,7 @@ class ConfigData(object):
         self._parse_config(filenames)
 
     def _parse_config(self, filenames):
-        parser = ConfigParser.SafeConfigParser()
+        parser = configparser.SafeConfigParser()
         parser.read(filenames)
         for section in parser.sections():
             if section == 'global':

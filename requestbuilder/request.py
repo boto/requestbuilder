@@ -12,7 +12,7 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
 # OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-from __future__ import absolute_import
+from __future__ import absolute_import, print_function
 
 import argparse
 import copy
@@ -29,6 +29,9 @@ from requestbuilder.exceptions import ServerError
 from requestbuilder.service import BaseService
 from requestbuilder.util import aggregate_subclass_fields
 from requestbuilder.xmlparse import parse_listdelimited_aws_xml
+
+
+import six
 
 
 class BaseRequest(BaseCommand):
@@ -216,7 +219,7 @@ class BaseRequest(BaseCommand):
         if isinstance(err, ServerError):
             msg = '{0}: {1}'.format(os.path.basename(sys.argv[0]),
                                     err.format_for_cli())
-            print >> sys.stderr, msg
+            print(msg, file=sys.stderr)
             if self.debug:
                 raise
             sys.exit(1)
@@ -323,7 +326,7 @@ class AWSQueryRequest(BaseRequest):
         if args is None:
             pass
         elif isinstance(args, dict):
-            for (key, val) in args.iteritems():
+            for (key, val) in six.iteritems(args):
                 # Prefix.Key1, Prefix.Key2, ...
                 if prefix:
                     prefixed_key = '{0}.{1}'.format(prefix, key)
@@ -434,7 +437,7 @@ def _process_filters(cli_filters):
         filter_args[key].append(val)
     # Build the flattenable [{'Name': key, 'Value': [value, ...]}, ...]
     filters = [{'Name': name, 'Value': values} for (name, values)
-               in filter_args.iteritems()]
+               in six.iteritems(filter_args)]
     return filters
 
 
