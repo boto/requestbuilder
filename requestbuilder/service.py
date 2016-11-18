@@ -171,10 +171,10 @@ class BaseService(RegionConfigurableMixin):
                                   attempt_no, max_tries)
                     p_request = self.__log_and_prepare_request(
                         method, url, params, data, files, headers, auth)
-                    p_request.start_time = datetime.datetime.now()
                     proxies = requests.utils.get_environ_proxies(url)
                     for key, val in sorted(proxies.items()):
-                        self.log.debug('request proxy:  %s=%s', key, val)
+                        self.log.debug('request  proxy:  %s=%s', key, val)
+                    p_request.start_time = datetime.datetime.now()
                     try:
                         response = self.session.send(
                             p_request, timeout=self.timeout, proxies=proxies,
@@ -279,20 +279,20 @@ class BaseService(RegionConfigurableMixin):
                                    auth=bound_auth)
         p_request = self.session.prepare_request(request)
         p_request.hooks = {'response': hooks['response']}
-        self.log.debug('request method: %s', request.method)
-        self.log.debug('request url:    %s', p_request.url)
+        self.log.debug('request  method: %s', request.method)
+        self.log.debug('request  url:    %s', p_request.url)
         if isinstance(p_request.headers, (dict, collections.Mapping)):
             for key, val in sorted(p_request.headers.iteritems()):
                 if key.lower().endswith('password'):
                     val = '<redacted>'
-                self.log.debug('request header: %s: %s', key, val)
+                self.log.debug('request  header: %s: %s', key, val)
         if isinstance(request.params, (dict, collections.Mapping)):
             for key, val in sorted(urlparse.parse_qsl(
                     urlparse.urlparse(p_request.url).query,
                     keep_blank_values=True)):
                 if key.lower().endswith('password'):
                     val = '<redacted>'
-                self.log.debug('request param:  %s: %s', key, val)
+                self.log.debug('request  param:  %s: %s', key, val)
         if isinstance(request.data, (dict, collections.Mapping)):
             content_type, content_type_params = cgi.parse_header(
                 p_request.headers.get('content-type') or '')
@@ -313,12 +313,12 @@ class BaseService(RegionConfigurableMixin):
                 # pylint: enable=superfluous-parens
                 if key.lower().endswith('password'):
                     val = '<redacted>'
-                self.log.debug('request data:   %s: %s', key, val)
+                self.log.debug('request  data:   %s: %s', key, val)
         if isinstance(request.files, (dict, collections.Mapping)):
             for key, val in sorted(request.files.iteritems()):
                 if hasattr(val, '__len__'):
                     val = '<{0} bytes>'.format(len(val))
-                self.log.debug('request file:   %s: %s', key, val)
+                self.log.debug('request  file:   %s: %s', key, val)
         return p_request
 
     def __configure_endpoint(self):
@@ -346,7 +346,7 @@ class BaseService(RegionConfigurableMixin):
 def _log_response_data(logger, response, **_):
     if hasattr(response.request, 'start_time'):
         duration = datetime.datetime.now() - response.request.start_time
-        logger.debug('response time: %i.%03i seconds', duration.seconds,
+        logger.debug('response time:   %i.%03i seconds', duration.seconds,
                      duration.microseconds // 1000)
     if response.status_code >= 400:
         logger.error('response status: %i', response.status_code)
