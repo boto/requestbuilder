@@ -1,4 +1,4 @@
-# Copyright (c) 2012-2015, Eucalyptus Systems, Inc.
+# Copyright (c) 2012-2016 Hewlett Packard Enterprise Development LP
 #
 # Permission to use, copy, modify, and/or distribute this software for
 # any purpose with or without fee is hereby granted, provided that the
@@ -29,15 +29,14 @@ try:
 except ImportError:
     import pdb
 
+import six
+
 from requestbuilder import Arg, MutuallyExclusiveArgList
 from requestbuilder.config import ConfigData, ConfigView
 from requestbuilder.exceptions import ArgumentError
 from requestbuilder.logging import configure_root_logger
 from requestbuilder.suite import RequestBuilder
 from requestbuilder.util import add_default_routes, aggregate_subclass_fields
-
-
-import six
 
 
 class BaseCommand(object):

@@ -23,15 +23,14 @@ import sys
 import textwrap
 import warnings
 
+import six
+
 from requestbuilder import EMPTY, PARAMS
 from requestbuilder.command import BaseCommand
 from requestbuilder.exceptions import ServerError
 from requestbuilder.service import BaseService
 from requestbuilder.util import aggregate_subclass_fields
 from requestbuilder.xmlparse import parse_listdelimited_aws_xml
-
-
-import six
 
 
 class BaseRequest(BaseCommand):

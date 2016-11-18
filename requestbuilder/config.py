@@ -17,9 +17,7 @@ from __future__ import absolute_import
 import itertools
 import logging
 
-
-import six
-from six.moves import configparser
+import six.moves
 
 
 class ConfigView(object):
@@ -118,7 +116,7 @@ class ConfigData(object):
         self._parse_config(filenames)
 
     def _parse_config(self, filenames):
-        parser = configparser.SafeConfigParser()
+        parser = six.moves.configparser.SafeConfigParser()
         parser.read(filenames)
         for section in parser.sections():
             if section == 'global':
