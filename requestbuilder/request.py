@@ -102,6 +102,10 @@ class BaseRequest(BaseCommand):
             # pylint: enable=not-callable
         return self.__auth
 
+    @auth.setter
+    def auth(self, newval):
+        self.__auth = newval
+
     @property
     def service(self):
         if not self.__service and self.SERVICE_CLASS is not None:
